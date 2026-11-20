@@ -21,7 +21,7 @@ $allPass = $true
 $lines = @(); $fail1 = 0
 foreach ($p in $prefixes) {
     $want = @($ids | Where-Object { $_.StartsWith($p, [StringComparison]::OrdinalIgnoreCase) })
-    $got = Read-JsonArray (Join-Path $Dir "ids_$p.json")
+    $got = @(Read-JsonArray (Join-Path $Dir "ids_$p.json"))
     $st = $statusOf["ids|$p"]
     $ok = ($st -eq 200) -and ($want.Count -ge 1) -and ($want.Count -lt 30) -and ($got.Count -gt 0) -and (Same-Set $got $want)
     if (-not $ok) { $fail1++ }
@@ -36,7 +36,7 @@ $lines | Write-Host
 $lines = @(); $fail2 = 0
 foreach ($id in $ids) {
     $want = @($expected.$id)
-    $got = Read-JsonArray (Join-Path $Dir "versions_$id.json")
+    $got = @(Read-JsonArray (Join-Path $Dir "versions_$id.json"))
     $st = $statusOf["versions|$id"]
     $ok = ($st -eq 200) -and ($got.Count -gt 0) -and (Same-Set $got $want)
     if (-not $ok) { $fail2++ }
