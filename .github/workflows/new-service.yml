@@ -96,3 +96,86 @@ jobs:
           name: new-service-state-${{ matrix.state }}
           path: out/
           if-no-files-found: warn
+
+  # Done-when 4: the service answers from the database, not from the recordings. The recordings
+  # are moved out of the checkout before the build; the published output and the container image
+  # must hold none of them. The container then serves state A, mutate.sql changes the database
+  # directly, and the affected responses must change exactly as the data says.
+  mutation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Database (state A)
+        uses: ./.github/actions/service-under-test
+        with:
+          snapshot-artifact: seed-snapshot
+          snapshot-run-id: ${{ env.SNAPSHOT_RUN_ID }}
+          start-service: 'false'
+
+      - name: Verify the recordings, then move them out of the checkout
+        shell: pwsh
+        run: |
+          ./scripts/runner/verify-recordings.ps1 -Snapshot "$env:RUNNER_TEMP/snapshot"
+          Move-Item recordings "$env:RUNNER_TEMP/recordings"
+
+      - name: Publish the service and its container image
+        run: |
+          dotnet publish service/src/GalleryReadService -c Release -o "$RUNNER_TEMP/publish"
+          dotnet publish service/src/GalleryReadService -c Release /t:PublishContainer -p:ContainerImageTag=check4
+
+      - name: Check 4, first half (no recording in the build output or the image)
+        run: scripts/linux/no-recordings-in-build.sh "$RUNNER_TEMP/recordings" "$RUNNER_TEMP/publish" gallery-read-service:check4
+
+      - name: Start the container as the read-only login
+        run: |
+          docker run -d --name service --network host -e ASPNETCORE_HTTP_PORTS=5080 \
+            -e Database__ConnectionString="Server=localhost,1433;Database=NuGetGallery;User Id=reader;Password=$READER_PASSWORD;TrustServerCertificate=True" \
+            gallery-read-service:check4
+          for _ in $(seq 1 30); do
+            if curl -sf http://localhost:5080/health > /dev/null; then echo 'service healthy'; exit 0; fi
+            sleep 1
+          done
+          docker logs service; exit 1
+
+      - name: Check 4, second half (change the database, check the responses)
+        shell: pwsh
+        run: ./scripts/linux/mutation-check.ps1 -Recorded "$env:RUNNER_TEMP/recordings/state-a"
+
+      - name: Upload outputs
+        if: always()
+        run: mkdir -p out && docker logs service > out/service.log 2>&1 || true
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: new-service-mutation
+          path: out/
+          if-no-files-found: warn
+
+  # Done-when 5: the comparator can fail. One planted wrong response must be reported, alone.
+  negative-control:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Database (state A) and service
+        uses: ./.github/actions/service-under-test
+        with:
+          snapshot-artifact: seed-snapshot
+          snapshot-run-id: ${{ env.SNAPSHOT_RUN_ID }}
+
+      - name: Check 5 (one wrong response, and the comparison must fail on it alone)
+        shell: pwsh
+        run: ./scripts/linux/negative-control.ps1
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: new-service-negative-control
+          path: out/
+          if-no-files-found: warn

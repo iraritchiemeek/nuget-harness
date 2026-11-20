@@ -1,7 +1,8 @@
 name: service-under-test
 description: >
   On ubuntu-24.04: download a gallery database snapshot, restore it into SQL Server in Docker,
-  publish the new service and start it on http://localhost:5080 as the read-only login `reader`.
+  and (unless start-service is 'false') publish the new service and start it on
+  http://localhost:5080 as the read-only login `reader`.
   Leaves SA_PASSWORD and READER_PASSWORD (generated here, masked) in the job environment, and the
   service log at $RUNNER_TEMP/service.log. The caller checks out this repository first.
 
@@ -12,6 +13,10 @@ inputs:
   snapshot-run-id:
     description: The run that made the snapshot artifact
     required: true
+  start-service:
+    description: "'false' to leave building and starting the service to the caller"
+    required: false
+    default: 'true'
 
 runs:
   using: composite
@@ -42,10 +47,12 @@ runs:
         global-json-file: service/global.json
 
     - name: Publish the service
+      if: inputs.start-service == 'true'
       shell: bash
       run: dotnet publish service/src/GalleryReadService -c Release -o "$RUNNER_TEMP/publish"
 
     - name: Start the service as the read-only login
+      if: inputs.start-service == 'true'
       shell: bash
       run: |
         export Database__ConnectionString="Server=localhost,1433;Database=NuGetGallery;User Id=reader;Password=$READER_PASSWORD;TrustServerCertificate=True"
