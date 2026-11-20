@@ -48,7 +48,7 @@ This was recorded before deciding anything, as the spec asks.
   - The transform would also need the download counts, which are not in the body.
 - **What does reproduce the recordings.** `ThenBy(Key)`, oldest registration first, matched all 9 records byte for byte in state A and in state B.
 - **Decision (interim; the owner decides).** The service breaks ties by registration key. It is deterministic, does not depend on the plan, and needs no approved difference, because every recorded answer is unchanged. So spec 02b bug 2 is fixed (ties have a defined order), but not as specified (by ID). Switching to ID would take one line in `PackageQueries.cs`, plus a way to record answers whose top 30 is not cut inside a tie. For example, a data state with distinct download counts, recorded by the recording workflow, would let a reorder-only rule cover it. That is the owner's call, so `approved-differences.json` has no rule for bug 2.
-- The CI run that shows the same 9 failures is listed under Runs below.
+- **The same in CI.** Probe branch `probe-tiebreak-id` changed only `ThenBy(Key)` to `ThenBy(Id)`. Its new-service run [44686598178](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44686598178) failed check 3 in both states with 339/348 identical. The 9 differing records were exactly the 9 above, and the negative-control baseline failed for the same reason. The branch is deleted.
 
 ### Other plan-order or collation dependence
 
@@ -56,3 +56,32 @@ The old queries were checked for other places where the answer depends on chance
 - **Prefix search** orders by `Id`, and `Id` is unique under the database's case-insensitive collation (`IX_PackageRegistration_Id_Unique`, `SQL_Latin1_General_CP1_CI_AS`). So the order is fully defined. Collation order is not ordinal order (`Newtonsoft.Json` sorts before `NLog`), but that is the database's rule, not chance, and the query still applies it in SQL.
 - **The 30 cap** on the prefix search comes after a total order, so which 30 come back is defined.
 - **`package-versions/{id}`** matches with `=`, which ignores trailing spaces. A trailing-space ID never reaches the old app, though: IIS trims it (spec 02 amendment A4).
+
+### Re-record with the rules file
+
+- Record run [44685874893](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44685874893) on `1432eda` passed. The bot commit `4137f34` changed only `recordings/manifest.json`, which now hashes `approved-differences.json`. All 702 records (351 per state) are byte for byte unchanged. Release `recordings-44685874893` holds the recording.
+- The record job checked the rules under Windows PowerShell 5.1 (`verify-recordings.ps1 -ThisRun`), and live parity then applied them under 5.1, so the comparator runs on both PowerShell editions.
+
+### new-service no longer goes red by design on a re-record push
+
+- **The problem.** A push that changes a recording input starts `record` and `new-service` together. `new-service` then checked the new inputs against the old manifest and failed, as it is built to. Examples: [44685874884](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44685874884) (this session) and [44678823125](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44678823125) (spec 02 session 6). Each such red run was expected, but it reads as a failure to anyone looking.
+- **The fix,** in `193b99d`:
+  - A first job, `inputs`, diffs the push against record.yml's input paths. If the push touched one, the check jobs are skipped on that push, not failed.
+  - `new-service` also runs on `workflow_run` when `record` completes on `main`, whether the run succeeded or failed. It then checks `main` as the recording run left it.
+  - The bot's commit is pushed with `GITHUB_TOKEN` and starts no workflow, which is why the trigger is the record run's completion, not the bot's push.
+- **Nothing is weakened.** Every push that changes inputs still ends in a full new-service run against the new recording. If the re-record fails, the run still happens and is red.
+- **Proof:** see Runs.
+
+### Probe branches
+
+A probe branch is a deliberate experiment: a throwaway branch that changes one thing to show what a check does with it. Its red runs are the intended result, and the branch is deleted afterwards.
+
+| Branch | Change | Run | Intended result |
+|---|---|---|---|
+| `probe-tiebreak-id` | most-downloaded ties by ID (spec 02b's fix) instead of by registration key | new-service [44686598178](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44686598178) | **red**: check 3 fails in both states on exactly the 9 blank-`partialId` records |
+
+### Mutation score
+
+- Stryker on `1432eda`: 81.25%, against a break threshold of 80 ([44685875127](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44685875127)). Spec 02's code scored 90.82%.
+- Most of the 20 survivors are in `GalleryDb.OnModelCreating`, the table and column mapping. EF Core builds the model once per process and caches it, so a mutant switched on after that changes nothing. A wrong table name would break every query.
+- The other survivors are the same `HostingRules` and startup lines as before. Nothing was excluded from mutation.

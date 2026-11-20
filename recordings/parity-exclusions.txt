@@ -1,6 +1,8 @@
 # Recorded requests compared in part by the new service's parity checks (spec 02 checks 3 and 6),
 # one per line: the request line, the mode, then the reason, which starts with the amendment that
 # allows the mode. Every other recorded request is compared byte for byte.
+# A deliberate difference from the old app is not an exclusion: it is a rule in
+# approved-differences.json (spec 02b), and the records it covers are still compared byte for byte.
 #
 # compare.ps1 checks each entry against the recorded (old app) side, and fails on any entry that
 # breaks its amendment's condition (scripts/runner/common.ps1, Read-ParityExclusionFile):
