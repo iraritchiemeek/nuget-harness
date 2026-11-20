@@ -74,7 +74,7 @@ foreach ($r in $records) {
     if ($Changed -and -not (Test-SameRecord $b $c $r)) { $changedCount++ }
     if (Test-SameRecord $b $a $r) { continue }
     $differ++
-    $bm = Read-Meta (Join-Path $Before "$r.meta"); $am = Read-Meta (Join-Path $After "$r.meta")
+    $bm = @(Read-Meta (Join-Path $Before "$r.meta")); $am = @(Read-Meta (Join-Path $After "$r.meta"))
     $request = if ($bm.Count) { $bm[0] } elseif ($am.Count) { $am[0] } else { $r }
     if (-not $am.Count -or -not $bm.Count) {
         $report += "MISSING    $r  $request  (only in $(if ($bm.Count) { 'the expected side' } else { 'the actual side' }))"
