@@ -70,7 +70,7 @@ jobs:
         run: .\scripts\runner\secret-scan.ps1 -Dir out\snapshot
 
       - name: Upload snapshot
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: seed-snapshot
           path: out/snapshot/
@@ -107,7 +107,7 @@ jobs:
 
       - name: Upload check outputs
         if: always() && steps.scan.outcome == 'success'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: check-outputs
           path: |
@@ -172,7 +172,7 @@ jobs:
 
       - name: Upload outputs
         if: always() && steps.scan.outcome == 'success'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: fresh-machine-restore-outputs
           path: out/

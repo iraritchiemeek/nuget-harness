@@ -38,7 +38,7 @@ jobs:
       - name: Publish (from service/, so service/global.json picks the SDK)
         working-directory: service
         run: dotnet publish src/GalleryReadService -c Release -r win-x64 --self-contained -o "$RUNNER_TEMP/service"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: service-win-x64
           path: ${{ runner.temp }}/service
@@ -121,7 +121,7 @@ jobs:
 
       - name: Upload outputs
         if: always() && steps.scan.outcome == 'success'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: live-parity
           path: out/
