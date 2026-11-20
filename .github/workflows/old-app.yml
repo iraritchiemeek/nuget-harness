@@ -26,7 +26,7 @@ jobs:
           path: gallery
           fetch-depth: 1
 
-      - name: Pin .NET SDK to 8.x (runner change, not app change)
+      - name: Park .NET SDKs newer than 9 (runner change, not app change)
         run: .\scripts\runner\pin-dotnet-sdk.ps1
 
       - name: Build (gallery build.ps1 -SkipJobs -SkipArtifacts)
