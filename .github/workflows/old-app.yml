@@ -46,8 +46,39 @@ jobs:
           path: ${{ runner.temp }}\seed-packages
           key: seed-${{ hashFiles('seed/packages.txt') }}
 
+      # The app is pinned and never edited, so its build output only changes with the SHA or the
+      # runner image. On a hit, build.ps1 is skipped entirely.
+      - name: Read runner image version
+        id: image
+        run: Add-Content $env:GITHUB_OUTPUT "key=$env:ImageOS-$env:ImageVersion"
+
+      - name: Restore cached gallery build output
+        id: buildcache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            gallery/src/NuGetGallery
+            !gallery/src/NuGetGallery/obj
+          key: gallery-build-${{ env.GALLERY_SHA }}-${{ steps.image.outputs.key }}
+
       - name: Build (gallery build.ps1 -SkipJobs -SkipArtifacts)
+        if: steps.buildcache.outputs.cache-hit != 'true'
         run: .\scripts\runner\build.ps1
+
+      - name: Save gallery build output
+        if: steps.buildcache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            gallery/src/NuGetGallery
+            !gallery/src/NuGetGallery/obj
+          key: ${{ steps.buildcache.outputs.cache-primary-key }}
+
+      - name: Record build source
+        run: |
+          if ('${{ steps.buildcache.outputs.cache-hit }}' -eq 'true') { $m = 'restored from cache (build.ps1 skipped)' } else { $m = 'built with build.ps1' }
+          if (-not (Test-Path gallery\src\NuGetGallery\bin\NuGetGallery.dll)) { throw 'NuGetGallery.dll missing' }
+          Add-Content $env:GITHUB_STEP_SUMMARY "- gallery build output: $m (image $env:ImageOS $env:ImageVersion)"
 
       - name: Setup (gallery tools\Setup-DevEnvironment.ps1)
         run: .\scripts\runner\setup.ps1
