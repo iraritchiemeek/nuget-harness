@@ -40,7 +40,7 @@ benchmark.yml    old app and new service in turn under the same k6 load, both ov
 
 ## Verify it yourself
 
-Open the three runs listed at the top of [`evidence/02/parity-report.md`](evidence/02/parity-report.md): the recording run, the new-service run and the live-parity run. For the code as it stands after spec 02b, every check and its run is in the table at the end of [`evidence/02b/run-log.md`](evidence/02b/run-log.md). Each job summary states its checks and counts, and each run's artifacts hold the full reports (`out/checks/spec02-*.txt`).
+Open the three runs listed at the top of [`evidence/02/parity-report.md`](evidence/02/parity-report.md): the recording run, the new-service run and the live-parity run. For the code as it stands after spec 02b, every check and its run is in the "Every check on the final code" table in [`evidence/02b/run-log.md`](evidence/02b/run-log.md). Each job summary states its checks and counts, and each run's artifacts hold the full reports (`out/checks/spec02-*.txt`).
 
 To run the service's tests locally (needs the .NET SDK named in `service/global.json`, Docker, and the GitHub CLI):
 
