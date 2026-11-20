@@ -1,17 +1,19 @@
 # Compare two folders of records made by capture.ps1, record by record: the .meta file (status
 # and compared headers) and the .body file, byte for byte. Every difference is listed in the
-# report, with the differing header lines and the start of both bodies.
+# report, with the differing header lines and the start of both bodies. A record that is on one
+# side only is reported as MISSING.
 # -Before is the expected side (for spec 02, the old app's recordings) and -After the actual side.
 # With -Changed (spec 01 check 5) the change in between must also have altered at least one record,
 # so that the comparison is not vacuous.
-# -Exclusions names a file of requests compared in part, one per line: the request line, the mode,
-# then the reason. Each one must be a recorded request. The report lists them, so none is silent.
-#   excluded     (spec 02 amendment A1) left out of the comparison. A GET cannot be excluded.
+# -Exclusions names the parity exclusions file (recordings/parity-exclusions.txt), read and checked
+# against -Before by Read-ParityExclusionFile in common.ps1. The report lists every entry, so none is silent.
+#   excluded     (spec 02 amendment A1) left out of the comparison
 #   status-only  (spec 02 amendment A4) only the status lines must match; the headers and body are
-#                the web server's own error page and are not compared.
+#                the web server's own error page and are not compared
+# The report is written to out/checks/<OutName>; OutName starts with the spec, as in spec02-check3-state-a.txt.
 param([Parameter(Mandatory)] [string]$Before, [string]$Changed, [Parameter(Mandatory)] [string]$After,
-      [int]$CheckNumber = 5, [string]$Name = 'reset is exact', [string]$OutName = 'check5-reset.txt',
-      [string]$Exclusions)
+      [Parameter(Mandatory)] [int]$CheckNumber, [Parameter(Mandatory)] [string]$Name,
+      [Parameter(Mandatory)] [ValidatePattern('^spec\d\d-')] [string]$OutName, [string]$Exclusions)
 . "$PSScriptRoot\common.ps1"
 $checkDir = Join-Path $OutDir 'checks'
 New-Item -ItemType Directory -Force -Path $checkDir | Out-Null
@@ -50,23 +52,11 @@ $report = @(); $differ = 0; $changedCount = 0
 
 $excluded = @{}; $statusOnly = @{}
 if ($Exclusions) {
-    foreach ($line in Get-Content $Exclusions | Where-Object { $_.Trim() -and -not $_.StartsWith('#') }) {
-        if ($line -notmatch '^(\S+ \S+)\s+(\S+)\s+(\S.*)$') { throw "exclusion needs a request, a mode and a reason: $line" }
-        $request = $Matches[1]; $mode = $Matches[2]; $reason = $Matches[3]
-        $r = Get-RecordName $request
-        if ($records -notcontains $r) { throw "exclusion is not a recorded request: $request" }
-        switch -CaseSensitive ($mode) {
-            'excluded' {
-                if ($request.StartsWith('GET ')) { throw "a GET request cannot be excluded: $request" }
-                $excluded[$r] = $true
-                $report += "EXCLUDED   $r  $request  ($reason)"
-            }
-            'status-only' {
-                $statusOnly[$r] = $request
-                $report += "STATUS-ONLY  $r  $request  ($reason)"
-            }
-            default { throw "unknown exclusion mode '$mode': $line" }
-        }
+    $entries = Read-ParityExclusionFile -File $Exclusions -Recorded $Before
+    foreach ($r in $entries.Keys | Sort-Object) {
+        $e = $entries[$r]
+        if ($e.Mode -ceq 'excluded') { $excluded[$r] = $true; $report += "EXCLUDED   $r  $($e.Request)  ($($e.Reason))" }
+        else { $statusOnly[$r] = $e.Request; $report += "STATUS-ONLY  $r  $($e.Request)  ($($e.Reason))" }
     }
 }
 foreach ($r in $records) {
@@ -86,6 +76,10 @@ foreach ($r in $records) {
     $differ++
     $bm = Read-Meta (Join-Path $Before "$r.meta"); $am = Read-Meta (Join-Path $After "$r.meta")
     $request = if ($bm.Count) { $bm[0] } elseif ($am.Count) { $am[0] } else { $r }
+    if (-not $am.Count -or -not $bm.Count) {
+        $report += "MISSING    $r  $request  (only in $(if ($bm.Count) { 'the expected side' } else { 'the actual side' }))"
+        continue
+    }
     $report += "DIFFERENT  $r  $request"
     foreach ($d in Compare-Object $bm $am -CaseSensitive) {
         $side = if ($d.SideIndicator -eq '<=') { 'expected' } else { 'actual  ' }
@@ -98,12 +92,12 @@ foreach ($r in $records) {
 }
 $compared = $records.Count - $excluded.Count
 $summary = @("records: $($records.Count)", "excluded: $($excluded.Count)", "status only: $($statusOnly.Count)", "different: $differ")
-if ($Changed) { $summary += "changed by the mutation: $changedCount" }
+if ($Changed) { $summary += "changed by the data change: $changedCount" }
 @($summary + $report) | Set-Content (Join-Path $checkDir $OutName) -Encoding utf8
 $report | Select-Object -First 60 | Write-Host
 
 $ok = ($differ -eq 0) -and ($compared -gt 0) -and ((-not $Changed) -or ($changedCount -gt 0))
-$detail = "$($compared - $differ)/$compared records identical" + $(if ($statusOnly.Count) { " ($($statusOnly.Count) by status only)" } else { '' }) + $(if ($excluded.Count) { ", $($excluded.Count) excluded" } else { '' }) + $(if ($Changed) { "; the mutation changed $changedCount" } else { '' }) + " ($OutName)"
+$detail = "$($compared - $differ)/$compared records identical" + $(if ($statusOnly.Count) { " ($($statusOnly.Count) by status only)" } else { '' }) + $(if ($excluded.Count) { ", $($excluded.Count) excluded" } else { '' }) + $(if ($Changed) { "; the data change changed $changedCount" } else { '' }) + " ($OutName)"
 Write-Result $CheckNumber $Name $ok $detail
 Write-Summary "- $Name`: $(if ($ok) {'pass'} else {'FAIL'}) - $detail"
 if (-not $ok) { throw "$Name`: failed" }

@@ -1,20 +1,64 @@
 # Recorded requests compared in part by the new service's parity checks (spec 02 checks 3 and 6),
-# one per line: the request line, the mode, then the reason. compare.ps1 refuses an unknown mode, a
-# GET in mode excluded, and a line that is not in the request set. Every other recorded request is
-# compared byte for byte.
+# one per line: the request line, the mode, then the reason, which starts with the amendment that
+# allows the mode. Every other recorded request is compared byte for byte.
 #
-# Mode excluded, spec 02 amendment A1: methods other than GET stay with the old app. It answers them
-# with ASP.NET's developer-detail 404 page (the recorder is a local client), which embeds the
-# framework build and a stack trace. The new service answers 405 with Allow: GET, pinned by a test in
-# service/test. The next spec's proxy routes only GET on these paths to the new service, and its
-# parity check covers these requests end to end.
+# compare.ps1 checks each entry against the recorded (old app) side, and fails on any entry that
+# breaks its amendment's condition (scripts/runner/common.ps1, Read-ParityExclusionFile):
 #
-# Mode status-only, spec 02 amendment A4: the old app's code never sees these requests. IIS trims the
-# trailing spaces of a whitespace-only id, finds no route and answers 404.4 with its detailed error
-# page, which embeds the hosting machine's file paths. The status must match; the page is not
-# compared. The service's own answer (404, empty body) is pinned by a test in service/test.
+# Mode excluded, spec 02 amendment A1, allowed only for a method other than GET: methods other than
+# GET stay with the old app. It answers them with ASP.NET's developer-detail 404 page (the recorder
+# is a local client), which embeds the framework build and a stack trace. The new service answers
+# 405 with Allow: GET, pinned by a test in service/test. The next spec's proxy routes only GET on
+# these paths to the new service, and its parity check covers these requests end to end.
+#
+# Mode status-only, spec 02 amendment A4, allowed only where the recorded body is an error page that
+# the web server wrote, not the app: content type text/html, and the body carries the signature of
+# one of the three pages below. The status must match; the page is not compared. The service's own
+# answers are pinned by tests in service/test.
+#   - IIS's detailed error page: "<title>IIS 10.0 Detailed Error - 404.x". IIS answers before the
+#     app runs (404.4 no handler, 404.11 double escaping, 404.15 query string too long). The page
+#     embeds the hosting machine's file paths.
+#   - ASP.NET's error page: "Server Error in '/' Application" with an HttpException. ASP.NET's
+#     request checks reject the path before routing (requestPathInvalidCharacters, maxUrlLength).
+#     The page embeds the framework build and a stack trace.
+#   - http.sys's "Bad Request - Invalid URL" page: control characters in the path, or a path
+#     segment over 260 characters, rejected before IIS sees the request.
 POST /api/v2/package-ids?partialId=Serilog  excluded  A1: non-GET, routed to the old app by the next spec's proxy
 DELETE /api/v2/package-versions/Serilog  excluded  A1: non-GET, routed to the old app by the next spec's proxy
 PUT /api/v2/package-versions/Serilog  excluded  A1: non-GET, routed to the old app by the next spec's proxy
 GET /api/v2/package-versions/%20  status-only  A4: whitespace-only id, answered by IIS's own 404.4 page
 GET /api/v2/package-versions/%20%20  status-only  A4: whitespace-only id, answered by IIS's own 404.4 page
+GET /api/v2/package-versions/Serilog+Sinks  status-only  A4: IIS's detailed 404.11 error page
+GET /api/v2/package-versions/Serilog%2BSinks  status-only  A4: IIS's detailed 404.11 error page
+GET /api/v2/package-versions/Serilog.Exceptions+8.4.0  status-only  A4: IIS's detailed 404.11 error page
+GET /api/v2/package-versions/Serilog%2FSinks  status-only  A4: IIS's detailed 404.4 error page
+GET /api/v2/package-versions/Seri%3Clog  status-only  A4: ASP.NET's error page (potentially dangerous Request.Path)
+GET /api/v2/package-versions/Seri%3Elog  status-only  A4: ASP.NET's error page (potentially dangerous Request.Path)
+GET /api/v2/package-versions/Seri*log  status-only  A4: ASP.NET's error page (potentially dangerous Request.Path)
+GET /api/v2/package-versions/Seri%2Alog  status-only  A4: ASP.NET's error page (potentially dangerous Request.Path)
+GET /api/v2/package-versions/Seri%25log  status-only  A4: ASP.NET's error page (potentially dangerous Request.Path)
+GET /api/v2/package-versions/Seri:log  status-only  A4: ASP.NET's error page (potentially dangerous Request.Path)
+GET /api/v2/package-versions/Seri%3Alog  status-only  A4: ASP.NET's error page (potentially dangerous Request.Path)
+GET /api/v2/package-versions/Seri%5Clog  status-only  A4: IIS's detailed 404.4 error page
+GET /api/v2/package-versions/Seri%3Flog  status-only  A4: ASP.NET's error page (potentially dangerous Request.Path)
+GET /api/v2/package-versions/%09  status-only  A4: http.sys's Bad Request page (invalid URL)
+GET /api/v2/package-versions/%09%09  status-only  A4: http.sys's Bad Request page (invalid URL)
+GET /api/v2/package-versions/Serilog%09  status-only  A4: http.sys's Bad Request page (invalid URL)
+GET /api/v2/package-versions/%09Serilog  status-only  A4: http.sys's Bad Request page (invalid URL)
+GET /api/v2/package-versions/%20%09  status-only  A4: http.sys's Bad Request page (invalid URL)
+GET /api/v2/package-versions/%09%20  status-only  A4: http.sys's Bad Request page (invalid URL)
+GET /api/v2/package-versions/%0B  status-only  A4: http.sys's Bad Request page (invalid URL)
+GET /api/v2/package-versions/%0C  status-only  A4: http.sys's Bad Request page (invalid URL)
+GET /api/v2/package-versions/%0A  status-only  A4: http.sys's Bad Request page (invalid URL)
+GET /api/v2/package-versions/%0D  status-only  A4: http.sys's Bad Request page (invalid URL)
+GET /api/v2/package-versions/%C2%A0  status-only  A4: IIS's detailed 404.4 error page
+GET /api/v2/package-versions/%E3%80%80  status-only  A4: IIS's detailed 404.4 error page
+GET /api/v2/package-versions/.  status-only  A4: IIS's detailed 404.4 error page
+GET /api/v2/package-versions/.%20  status-only  A4: IIS's detailed 404.4 error page
+GET /api/v2/package-versions/<a*236>  status-only  A4: ASP.NET's error page (maxUrlLength)
+GET /api/v2/package-versions/<a*260>  status-only  A4: ASP.NET's error page (maxUrlLength)
+GET /api/v2/package-versions/<a*261>  status-only  A4: http.sys's Bad Request page (invalid URL)
+GET /api/v2/package-ids?partialId=Serilog&pad=<x*11979>  status-only  A4: IIS's detailed 404.15 error page
+GET /api/v2/package-ids?partialId=Serilog&pad=<x*12978>  status-only  A4: IIS's detailed 404.15 error page
+GET /api/v2/package-versions/Serilog?includePrerelease=true&pad=<x*11974>  status-only  A4: IIS's detailed 404.15 error page
+GET /api/v2/package-versions/Serilog?includePrerelease=true&pad=<x*12973>  status-only  A4: IIS's detailed 404.15 error page

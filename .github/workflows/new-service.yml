@@ -10,12 +10,10 @@ on:
 
 permissions:
   contents: read
-  actions: read # download the snapshots from the runs that made them
+  actions: read # verify-recordings.ps1 reads the recording run and downloads its artifact
 
 env:
-  # The old-app run whose seed-snapshot artifact (state A) every spec 02 job restores. The state B
-  # snapshot belongs to the recording run named in recordings/manifest.json.
-  SNAPSHOT_RUN_ID: '44653627352'
+  GH_TOKEN: ${{ github.token }}
   DOTNET_NOLOGO: 'true'
   DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
 
@@ -34,28 +32,16 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0 # verify-recordings.ps1 reads who last committed recordings/
-
-      - name: Which snapshot
-        run: |
-          if [ "${{ matrix.state }}" = a ]; then
-            echo "ARTIFACT=seed-snapshot" >> "$GITHUB_ENV"
-            echo "RUN_ID=$SNAPSHOT_RUN_ID" >> "$GITHUB_ENV"
-          else
-            echo "ARTIFACT=state-b-snapshot" >> "$GITHUB_ENV"
-            echo "RUN_ID=$(jq -r .stateBSnapshotRun recordings/manifest.json | sed 's#.*/##')" >> "$GITHUB_ENV"
-          fi
+          persist-credentials: false
 
       - name: Database and service
         uses: ./.github/actions/service-under-test
         with:
-          snapshot-artifact: ${{ env.ARTIFACT }}
-          snapshot-run-id: ${{ env.RUN_ID }}
+          state: ${{ matrix.state }}
 
-      - name: Verify the recordings against their manifest
+      - name: Verify the recordings against their manifest and the recording run
         shell: pwsh
-        run: |
-          $snap = if ('${{ matrix.state }}' -eq 'a') { @{ Snapshot = "$env:RUNNER_TEMP/snapshot" } } else { @{ StateBSnapshot = "$env:RUNNER_TEMP/snapshot" } }
-          ./scripts/runner/verify-recordings.ps1 @snap
+        run: ./scripts/runner/verify-recordings.ps1
 
       - name: Send every recorded request, fingerprinting the database before and after
         shell: pwsh
@@ -83,14 +69,20 @@ jobs:
         run: >-
           ./scripts/runner/compare.ps1 -Before recordings/state-${{ matrix.state }} -After out/new-service
           -Exclusions recordings/parity-exclusions.txt -CheckNumber 3
-          -Name 'state ${{ matrix.state }}: new service matches the recordings' -OutName check3-state-${{ matrix.state }}.txt
+          -Name 'state ${{ matrix.state }}: new service matches the recordings' -OutName spec02-check3-state-${{ matrix.state }}.txt
 
       - name: Service log
         if: always()
         run: cp "$RUNNER_TEMP/service.log" out/ 2>/dev/null || true
 
-      - name: Upload outputs
+      - name: Secret scan of the outputs
+        id: scan
         if: always()
+        shell: pwsh
+        run: ./scripts/runner/secret-scan.ps1 -Dir out
+
+      - name: Upload outputs
+        if: always() && steps.scan.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: new-service-state-${{ matrix.state }}
@@ -99,27 +91,27 @@ jobs:
 
   # Done-when 4: the service answers from the database, not from the recordings. The recordings
   # are moved out of the checkout before the build; the published output and the container image
-  # must hold none of them. The container then serves state A, mutate.sql changes the database
+  # must hold none of them. The container then serves state A, change-data.sql changes the database
   # directly, and the affected responses must change exactly as the data says.
-  mutation:
+  data-change:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # verify-recordings.ps1 reads who last committed recordings/
+          persist-credentials: false
 
       - name: Database (state A)
         uses: ./.github/actions/service-under-test
         with:
-          snapshot-artifact: seed-snapshot
-          snapshot-run-id: ${{ env.SNAPSHOT_RUN_ID }}
+          state: a
           start-service: 'false'
 
       - name: Verify the recordings, then move them out of the checkout
         shell: pwsh
         run: |
-          ./scripts/runner/verify-recordings.ps1 -Snapshot "$env:RUNNER_TEMP/snapshot"
+          ./scripts/runner/verify-recordings.ps1
           Move-Item recordings "$env:RUNNER_TEMP/recordings"
 
       - name: Publish the service and its container image (from service/, so service/global.json picks the SDK)
@@ -134,9 +126,8 @@ jobs:
 
       - name: Start the container as the read-only login
         run: |
-          docker run -d --name service --network host -e ASPNETCORE_HTTP_PORTS=5080 \
-            -e Database__ConnectionString="Server=localhost,1433;Database=NuGetGallery;User Id=reader;Password=$READER_PASSWORD;TrustServerCertificate=True" \
-            gallery-read-service:check4
+          export Database__ConnectionString="Server=localhost,1433;Database=NuGetGallery;User Id=reader;Password=$READER_PASSWORD;TrustServerCertificate=True"
+          docker run -d --name service --network host -e ASPNETCORE_HTTP_PORTS=5080 -e Database__ConnectionString gallery-read-service:check4
           for _ in $(seq 1 30); do
             if curl -sf http://localhost:5080/health > /dev/null; then echo 'service healthy'; exit 0; fi
             sleep 1
@@ -145,38 +136,57 @@ jobs:
 
       - name: Check 4, second half (change the database, check the responses)
         shell: pwsh
-        run: ./scripts/linux/mutation-check.ps1 -Recorded "$env:RUNNER_TEMP/recordings/state-a"
+        run: ./scripts/linux/data-change-check.ps1 -Recorded "$env:RUNNER_TEMP/recordings/state-a"
 
-      - name: Upload outputs
+      - name: Service log
         if: always()
         run: mkdir -p out && docker logs service > out/service.log 2>&1 || true
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - name: Secret scan of the outputs
+        id: scan
         if: always()
+        shell: pwsh
+        run: ./scripts/runner/secret-scan.ps1 -Dir out
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always() && steps.scan.outcome == 'success'
         with:
-          name: new-service-mutation
+          name: new-service-data-change
           path: out/
           if-no-files-found: warn
 
-  # Done-when 5: the comparator can fail. One planted wrong response must be reported, alone.
+  # Done-when 5: the comparator can fail, on the path check 3 takes (the recordings and the parity
+  # exclusions). Four planted faults, each of which must be reported alone and for its reason.
   negative-control:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0 # verify-recordings.ps1 reads who last committed recordings/
+          persist-credentials: false
 
       - name: Database (state A) and service
         uses: ./.github/actions/service-under-test
         with:
-          snapshot-artifact: seed-snapshot
-          snapshot-run-id: ${{ env.SNAPSHOT_RUN_ID }}
+          state: a
 
-      - name: Check 5 (one wrong response, and the comparison must fail on it alone)
+      - name: Verify the recordings against their manifest and the recording run
+        shell: pwsh
+        run: ./scripts/runner/verify-recordings.ps1
+
+      - name: Check 5 (planted faults, each reported alone and for its reason)
         shell: pwsh
         run: ./scripts/linux/negative-control.ps1
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - name: Secret scan of the outputs
+        id: scan
         if: always()
+        shell: pwsh
+        run: ./scripts/runner/secret-scan.ps1 -Dir out
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always() && steps.scan.outcome == 'success'
         with:
           name: new-service-negative-control
           path: out/

@@ -11,13 +11,17 @@
 #   ../NuGetGallery.Core/SemVerLevelKey.cs          semVerLevel parsed with NuGetVersion.TryParse; >= 2.0.0 means SemVer2
 #   Web.config                                     httpRuntime requestPathInvalidCharacters, relaxedUrlToFileSystemMapping
 #
+# "<c*N>" in a line stands for the character c repeated N times (scripts/runner/common.ps1, Expand-RequestLine),
+# so the very long requests below stay readable. Record names use the line as written.
+#
 # Not sent, on purpose:
-# - path characters in requestPathInvalidCharacters (< > * % : \ ?) and encoded slashes. ASP.NET and IIS reject them
-#   before the app runs, and answer local clients with a detailed error page that includes the server's file paths.
-# - + in a path segment, such as /api/v2/package-versions/Serilog+Sinks. IIS request filtering rejects it before the
-#   app runs (404.11, double escaping; seen in exploratory record run 44665262875), with the same kind of page.
-# - a path that matches neither route, such as /api/v2/package-versions/Serilog/extra. It never reaches these two
-#   endpoints, so it is not the new service's to answer; the proxy in the next spec sends it to the old app.
+# - a path that matches neither route, such as /api/v2/package-versions/Serilog/extra, or a dot segment that resolves to
+#   one (/api/v2/package-versions/..). It never reaches these two endpoints, so it is not the new service's to answer;
+#   the proxy in the next spec sends it to the old app.
+# - query values that ASP.NET request validation rejects (partialId=%3Cx, partialId=%26%23x, semVerLevel=%3Cx). The old
+#   app answers 500, and its own code writes the body: ApiController.OnException sends the exception's stack trace to a
+#   local client and its message to a remote one (exploratory record run 44674677772). Neither amendment A1 nor A4
+#   covers an app-written body, so these wait for a decision; see evidence/02/reviews.md, finding A2.
 
 # Seeded prefixes, one per line of seed/prefixes.txt (spec 01 check 1). Source: AutocompleteDatabasePackageIdsQuery.cs
 GET /api/v2/package-ids?partialId=Serilog
@@ -348,3 +352,77 @@ GET /api/v2/package-versions/Ninject?includePrerelease=true&semVerLevel=2.0.0
 GET /api/v2/package-ids?partialId=Ninject&includePrerelease=true&semVerLevel=2.0.0
 GET /api/v2/package-ids?partialId=xunit&includePrerelease=true&semVerLevel=2.0.0
 GET /api/v2/package-ids?partialId=Serilog.Exceptions&semVerLevel=2.0.0
+
+# A new ID under an existing prefix, in state B only (seed/state-b.txt): Serilog.Sinks.InMemory (stable) and
+# Serilog.Sinks.Map (prerelease only), so state B changes package-ids responses too. Source: AutocompleteDatabasePackageIdsQuery.cs
+GET /api/v2/package-ids?partialId=Serilog.Sinks.&includePrerelease=true
+GET /api/v2/package-ids?partialId=Serilog.Sinks.M
+GET /api/v2/package-ids?partialId=Serilog.Sinks.M&includePrerelease=true
+
+# Path characters that IIS request filtering or ASP.NET rejects before the app runs. Source: Web.config,
+# system.webServer/security/requestFiltering (allowDoubleEscaping defaults to false: + and %25 in a path) and
+# httpRuntime requestPathInvalidCharacters (< > * % : \ ?). Encoded slashes: http.sys and IIS decode %2F.
+GET /api/v2/package-versions/Serilog+Sinks
+GET /api/v2/package-versions/Serilog%2BSinks
+GET /api/v2/package-versions/Serilog.Exceptions+8.4.0
+GET /api/v2/package-versions/Serilog%2FSinks
+GET /api/v2/package-versions/Serilog%2F
+GET /api/v2/package-versions/Seri%3Clog
+GET /api/v2/package-versions/Seri%3Elog
+GET /api/v2/package-versions/Seri*log
+GET /api/v2/package-versions/Seri%2Alog
+GET /api/v2/package-versions/Seri%25log
+GET /api/v2/package-versions/Seri:log
+GET /api/v2/package-versions/Seri%3Alog
+GET /api/v2/package-versions/Seri%5Clog
+GET /api/v2/package-versions/Seri%3Flog
+
+# Query values with < that ASP.NET request validation lets through: < not followed by a letter, and a key the action
+# does not bind (validation runs only on the values the model binder reads). Source: ApiController.cs; the rejected
+# values are listed under "Not sent" at the top
+GET /api/v2/package-ids?partialId=Serilog%3C
+GET /api/v2/package-ids?partialId=%3C1
+GET /api/v2/package-versions/Serilog?partialId=%3Cx
+
+# Whitespace other than the space, and trailing dots, in IDs. IIS trims trailing spaces (recorded above for %20);
+# these show what it does with other characters. Source: {id} in Routes.cs, Web.config relaxedUrlToFileSystemMapping
+GET /api/v2/package-versions/%09
+GET /api/v2/package-versions/%09%09
+GET /api/v2/package-versions/Serilog%09
+GET /api/v2/package-versions/%09Serilog
+GET /api/v2/package-versions/%20%09
+GET /api/v2/package-versions/%09%20
+GET /api/v2/package-versions/%0B
+GET /api/v2/package-versions/%0C
+GET /api/v2/package-versions/%0A
+GET /api/v2/package-versions/%0D
+GET /api/v2/package-versions/%C2%A0
+GET /api/v2/package-versions/Serilog%C2%A0
+GET /api/v2/package-versions/%E3%80%80
+GET /api/v2/package-ids?partialId=%0B
+GET /api/v2/package-ids?partialId=%C2%A0
+GET /api/v2/package-versions/Serilog..
+GET /api/v2/package-versions/Serilog.%20
+GET /api/v2/package-versions/Serilog%20.
+GET /api/v2/package-versions/Serilog.Sinks.Console.
+GET /api/v2/package-versions/.
+GET /api/v2/package-versions/.%20
+
+# Long paths and query strings. Source: Web.config, httpRuntime maxQueryStringLength="12000" (maxUrlLength left at
+# its default of 260) and requestFiltering/requestLimits maxQueryString="12000"; http.sys limits a path segment to
+# 260 characters. Query lengths below count the characters after "?".
+GET /api/v2/package-versions/<a*235>
+GET /api/v2/package-versions/<a*236>
+GET /api/v2/package-versions/<a*260>
+GET /api/v2/package-versions/<a*261>
+GET /api/v2/package-ids?partialId=Serilog&pad=<x*2078>
+GET /api/v2/package-ids?partialId=Serilog&pad=<x*9978>
+GET /api/v2/package-ids?partialId=Serilog&pad=<x*11978>
+GET /api/v2/package-ids?partialId=Serilog&pad=<x*11979>
+GET /api/v2/package-ids?partialId=Serilog&pad=<x*12978>
+GET /api/v2/package-ids?partialId=<S*2090>
+GET /api/v2/package-versions/Serilog?includePrerelease=true&pad=<x*2073>
+GET /api/v2/package-versions/Serilog?includePrerelease=true&pad=<x*9973>
+GET /api/v2/package-versions/Serilog?includePrerelease=true&pad=<x*11973>
+GET /api/v2/package-versions/Serilog?includePrerelease=true&pad=<x*11974>
+GET /api/v2/package-versions/Serilog?includePrerelease=true&pad=<x*12973>

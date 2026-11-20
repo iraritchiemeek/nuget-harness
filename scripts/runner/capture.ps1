@@ -30,7 +30,7 @@ if (Test-Path $IgnoredHeaders) {
 $headerFile = Join-Path $Dir '_headers.tmp'
 $index = @()
 foreach ($line in $lines) {
-    $method, $path = $line -split ' ', 2
+    $method, $path = (Expand-RequestLine $line) -split ' ', 2
     $name = Get-RecordName $line
     $body = Join-Path $Dir "$name.body"
     # --path-as-is and -g send the path exactly as written (no dot-segment squashing, no globbing).
@@ -50,7 +50,7 @@ foreach ($line in $lines) {
     })
     [Array]::Sort($headers, [StringComparer]::Ordinal)   # ordinal, so Windows and Linux sort alike
     Write-Utf8File (Join-Path $Dir "$name.meta") (@($line, "status: $($r.Status)") + $headers)
-    $index += "$name`t$method`t$path`t$($r.Status)"
+    $index += "$name`t$method`t$(($line -split ' ', 2)[1])`t$($r.Status)"
 }
 Remove-Item $headerFile -ErrorAction SilentlyContinue
 Write-Utf8File (Join-Path $Dir '_index.tsv') $index

@@ -1,17 +1,15 @@
 name: service-under-test
 description: >
-  On ubuntu-24.04: download a gallery database snapshot, restore it into SQL Server in Docker,
-  and (unless start-service is 'false') publish the new service and start it on
+  On ubuntu-24.04: download a gallery database snapshot from the snapshots-v1 release and check its
+  digest against recordings/manifest.json (scripts/runner/get-snapshot.ps1), restore it into SQL
+  Server in Docker, and (unless start-service is 'false') publish the new service and start it on
   http://localhost:5080 as the read-only login `reader`.
   Leaves SA_PASSWORD and READER_PASSWORD (generated here, masked) in the job environment, and the
   service log at $RUNNER_TEMP/service.log. The caller checks out this repository first.
 
 inputs:
-  snapshot-artifact:
-    description: seed-snapshot (state A) or state-b-snapshot (state B)
-    required: true
-  snapshot-run-id:
-    description: The run that made the snapshot artifact
+  state:
+    description: a (the seed snapshot) or b (the state B snapshot of the recording run)
     required: true
   start-service:
     description: "'false' to leave building and starting the service to the caller"
@@ -21,13 +19,11 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Download ${{ inputs.snapshot-artifact }}
-      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-      with:
-        name: ${{ inputs.snapshot-artifact }}
-        path: ${{ runner.temp }}/snapshot
-        run-id: ${{ inputs.snapshot-run-id }}
-        github-token: ${{ github.token }}
+    - name: Download the state ${{ inputs.state }} snapshot and check its digest
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: ./scripts/runner/get-snapshot.ps1 -State ${{ inputs.state }} -Dir "$env:RUNNER_TEMP/snapshot"
 
     - name: Generate the SQL passwords
       shell: bash

@@ -9,4 +9,4 @@ $dir = Join-Path $OutDir "live\$Name"
 & "$PSScriptRoot\capture.ps1" -Requests $Requests -Dir "$dir\old-app"
 & "$PSScriptRoot\capture.ps1" -Requests $Requests -Dir "$dir\new-service" -Server $Service
 & "$PSScriptRoot\compare.ps1" -Before "$dir\old-app" -After "$dir\new-service" -Exclusions $Exclusions `
-    -CheckNumber 6 -Name "live parity, $Name" -OutName "check6-$Name.txt"
+    -CheckNumber 6 -Name "live parity, $Name" -OutName "spec02-check6-$Name.txt"

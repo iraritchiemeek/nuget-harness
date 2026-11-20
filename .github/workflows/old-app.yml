@@ -27,6 +27,8 @@ jobs:
         shell: powershell
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Build the gallery, or restore it from cache
         uses: ./.github/actions/gallery-build
@@ -76,11 +78,11 @@ jobs:
 
       - name: Check 5 (change state, reset, compare bytes)
         run: |
-          .\scripts\runner\mutate.ps1
+          .\scripts\runner\push-extra.ps1
           .\scripts\runner\capture.ps1 -Dir out\responses\changed
           .\scripts\runner\reset.ps1 -Dir out\snapshot
           .\scripts\runner\capture.ps1 -Dir out\responses\reset
-          .\scripts\runner\compare.ps1 -Before out\responses\seeded -Changed out\responses\changed -After out\responses\reset
+          .\scripts\runner\compare.ps1 -Before out\responses\seeded -Changed out\responses\changed -After out\responses\reset -CheckNumber 5 -Name 'reset is exact' -OutName spec01-check5-reset.txt
 
       - name: Check 7 (source and config diff)
         if: always()
@@ -99,11 +101,12 @@ jobs:
         run: .\scripts\runner\stop-site.ps1
 
       - name: Secret scan of the check outputs
+        id: scan
         if: always()
         run: .\scripts\runner\secret-scan.ps1 -Dir out
 
       - name: Upload check outputs
-        if: always()
+        if: always() && steps.scan.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: check-outputs
@@ -123,6 +126,8 @@ jobs:
         shell: powershell
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Build the gallery, or restore it from cache
         uses: ./.github/actions/gallery-build
@@ -149,7 +154,7 @@ jobs:
         run: |
           .\scripts\runner\reset.ps1 -Dir snapshot
           .\scripts\runner\capture.ps1 -Dir out\responses\restored
-          .\scripts\runner\compare.ps1 -Before first-job\responses\seeded -After out\responses\restored -CheckNumber 5 -Name 'snapshot restores byte-identically on a fresh machine' -OutName check5-fresh-machine.txt
+          .\scripts\runner\compare.ps1 -Before first-job\responses\seeded -After out\responses\restored -CheckNumber 5 -Name 'snapshot restores byte-identically on a fresh machine' -OutName spec01-check5-fresh-machine.txt
           .\scripts\runner\check.ps1 -Dir out\responses\restored
 
       - name: Diagnostics
@@ -160,8 +165,13 @@ jobs:
         if: always()
         run: .\scripts\runner\stop-site.ps1
 
-      - name: Upload outputs
+      - name: Secret scan of the outputs
+        id: scan
         if: always()
+        run: .\scripts\runner\secret-scan.ps1 -Dir out
+
+      - name: Upload outputs
+        if: always() && steps.scan.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: fresh-machine-restore-outputs

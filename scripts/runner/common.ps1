@@ -89,6 +89,64 @@ function Get-RecordName([string]$Line) {
     return -join ($hash[0..7] | ForEach-Object { $_.ToString('x2') })
 }
 
+# A request line as sent: "<c*N>" stands for the character c repeated N times, so very long paths
+# and query strings stay readable in a request file. Record names and reports use the line as written.
+function Expand-RequestLine([string]$Line) {
+    return [regex]::Replace($Line, '<(.)\*(\d+)>', { param($m) [string]::new($m.Groups[1].Value[0], [int]$m.Groups[2].Value) })
+}
+
+# Error pages that the web server writes, not the old app (spec 02 amendment A4): IIS's detailed
+# error page, ASP.NET's error page for an HttpException, and http.sys's invalid-URL page. Their
+# signatures were read from the recordings (exploratory record run 44674677772).
+$Script:ServerErrorPageSignatures = @(
+    @{ Name = "IIS's detailed error page"; Pattern = '<title>IIS 10\.0 Detailed Error - \d{3}\.\d+ - ' },
+    @{ Name = "ASP.NET's error page"; Pattern = "(?s)Server Error in '/' Application.*\[HttpException \(0x[0-9A-Fa-f]{8}\): " },
+    @{ Name = "http.sys's invalid-URL page"; Pattern = '<h2>Bad Request - Invalid URL</h2>' }
+)
+
+# Read the parity exclusions file (recordings/parity-exclusions.txt) and check every entry against
+# the recorded side in -Recorded (the old app's records): each must name a recorded request, and
+# must meet the condition of the amendment that allows its mode:
+#   excluded     A1, and only for a method other than GET
+#   status-only  A4, and only where the recorded body is a web-server error page: content type
+#                text/html and one of $ServerErrorPageSignatures
+# Returns a hashtable from record name to @{ Request; Mode; Reason }. Throws on any broken entry.
+function Read-ParityExclusionFile([string]$File, [string]$Recorded) {
+    $entries = @{}
+    foreach ($line in Get-Content $File | Where-Object { $_.Trim() -and -not $_.StartsWith('#') }) {
+        if ($line -notmatch '^(\S+ \S+)\s+(\S+)\s+((A\d+): \S.*)$') { throw "exclusion needs a request, a mode and a reason that starts with its amendment: $line" }
+        $e = @{ Request = $Matches[1]; Mode = $Matches[2]; Reason = $Matches[3]; Amendment = $Matches[4] }
+        $r = Get-RecordName $e.Request
+        $meta = Join-Path $Recorded "$r.meta"
+        if (-not (Test-Path $meta)) { throw "exclusion is not a recorded request: $($e.Request)" }
+        if ($entries.ContainsKey($r)) { throw "exclusion listed twice: $($e.Request)" }
+        switch -CaseSensitive ($e.Mode) {
+            'excluded' {
+                if ($e.Amendment -cne 'A1') { throw "mode excluded is allowed by amendment A1 only: $line" }
+                if ($e.Request.StartsWith('GET ')) { throw "a GET request cannot be excluded: $line" }
+            }
+            'status-only' {
+                if ($e.Amendment -cne 'A4') { throw "mode status-only is allowed by amendment A4 only: $line" }
+                $html = @(Get-Content $meta | Where-Object { $_ -clike 'content-type: text/html*' }).Count -gt 0
+                $text = [IO.File]::ReadAllText((Join-Path $Recorded "$r.body"))
+                $page = @($ServerErrorPageSignatures | Where-Object { $text -cmatch $_.Pattern })
+                if (-not $html -or -not $page) { throw "status-only needs a recorded web-server error page (text/html and a known signature): $line" }
+            }
+            default { throw "unknown exclusion mode '$($e.Mode)': $line" }
+        }
+        $entries[$r] = $e
+    }
+    return $entries
+}
+
+# The GitHub Release whose assets keep the database snapshots (get-snapshot.ps1), and an asset's
+# name: the artifact name and the id of the run that made it, from that run's URL.
+$Script:SnapshotRelease = 'snapshots-v1'
+function Get-SnapshotAssetName([string]$Artifact, [string]$RunUrl) {
+    if ($RunUrl -notmatch '/actions/runs/(\d+)$') { throw "not a run URL: $RunUrl" }
+    return "$Artifact-$($Matches[1]).tar.gz"
+}
+
 # Write text as UTF-8 without a BOM and with LF line ends, so Windows PowerShell 5.1 and pwsh on
 # Linux produce the same bytes.
 function Write-Utf8File([string]$Path, [string[]]$Lines) {

@@ -2,12 +2,17 @@ name: record
 
 # Spec 02: record the old app's answers to recordings/requests.txt, in two data states. The pinned
 # NuGetGallery runs on windows-2022.
-#   State A: the spec 01 seed snapshot, restored.
-#   State B: state A plus the pushes in seed/state-b.txt (amendment A2), snapshotted as the
-#            state-b-snapshot artifact of this run and restored from it before recording.
-# In each state the request set is sent twice, and the two passes must be byte-identical. Only then
-# are the records and recordings/manifest.json committed, by this workflow. Nothing else writes
-# recordings/state-a, recordings/state-b or the manifest.
+#   State A: the spec 01 seed snapshot, from the snapshots-v1 release (scripts/runner/get-snapshot.ps1).
+#   State B: state A plus the pushes in seed/state-b.txt (amendment A2), snapshotted as this run's
+#            state-b-snapshot artifact and restored from it before recording.
+# In each state the request set is sent twice, and the two passes must be byte-identical.
+# Two jobs, so that the long one cannot write to the repository:
+#   record  read-only. Records, assembles the recording and its manifest (write-manifest.ps1),
+#           checks them, and uploads them as the artifact "recording": exactly the tree that is
+#           committed as recordings/. verify-recordings.ps1 compares recordings/ with that artifact
+#           on every later run.
+#   commit  checks the artifact again, adds the state B snapshot to the snapshots-v1 release, and
+#           commits the recording. Nothing else writes recordings/state-a, recordings/state-b or the manifest.
 
 on:
   workflow_dispatch:
@@ -22,7 +27,6 @@ on:
 
 permissions:
   contents: read
-  actions: read # download seed-snapshot from the old-app run that made it
 
 concurrency:
   group: record
@@ -30,20 +34,22 @@ concurrency:
 
 env:
   GALLERY_SHA: 63e6ee4202b441e1c904d6f78fc7b070f36bc24f
-  SNAPSHOT_RUN_ID: '44653627352'
 
 jobs:
   record:
     runs-on: windows-2022
     timeout-minutes: 60
     permissions:
-      contents: write # commit the recording
-      actions: read
+      contents: read
     defaults:
       run:
         shell: powershell
+    env:
+      GH_TOKEN: ${{ github.token }} # get-snapshot.ps1 reads the public snapshots-v1 release
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Build the gallery, or restore it from cache
         uses: ./.github/actions/gallery-build
@@ -53,13 +59,8 @@ jobs:
       - name: Setup (gallery tools\Setup-DevEnvironment.ps1)
         run: .\scripts\runner\setup.ps1
 
-      - name: Download seed-snapshot
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: seed-snapshot
-          path: snapshot
-          run-id: ${{ env.SNAPSHOT_RUN_ID }}
-          github-token: ${{ github.token }}
+      - name: Download the seed snapshot and check its digest
+        run: .\scripts\runner\get-snapshot.ps1 -State a -Dir snapshot
 
       - name: Restore the snapshot and start the app
         run: .\scripts\runner\reset.ps1 -Dir snapshot
@@ -68,7 +69,7 @@ jobs:
         run: |
           .\scripts\runner\capture.ps1 -Requests recordings\requests.txt -Dir out\state-a\pass1
           .\scripts\runner\capture.ps1 -Requests recordings\requests.txt -Dir out\state-a\pass2
-          .\scripts\runner\compare.ps1 -Before out\state-a\pass1 -After out\state-a\pass2 -CheckNumber 1 -Name 'state A: two recording passes are byte-identical' -OutName record-passes-a.txt
+          .\scripts\runner\compare.ps1 -Before out\state-a\pass1 -After out\state-a\pass2 -CheckNumber 1 -Name 'state A: two recording passes are byte-identical' -OutName spec02-check1-passes-a.txt
 
       - name: 'State B: push seed/state-b.txt through the old app, snapshot, restore'
         run: |
@@ -88,7 +89,7 @@ jobs:
         run: |
           .\scripts\runner\capture.ps1 -Requests recordings\requests.txt -Dir out\state-b\pass1
           .\scripts\runner\capture.ps1 -Requests recordings\requests.txt -Dir out\state-b\pass2
-          .\scripts\runner\compare.ps1 -Before out\state-b\pass1 -After out\state-b\pass2 -CheckNumber 1 -Name 'state B: two recording passes are byte-identical' -OutName record-passes-b.txt
+          .\scripts\runner\compare.ps1 -Before out\state-b\pass1 -After out\state-b\pass2 -CheckNumber 1 -Name 'state B: two recording passes are byte-identical' -OutName spec02-check1-passes-b.txt
 
       - name: Save the SQL the old app sent (from the plan cache)
         run: .\scripts\runner\dump-sql.ps1 -OutFile out\old-app-sql.txt
@@ -96,14 +97,93 @@ jobs:
       - name: Source and config diff of the old app
         run: .\scripts\runner\source-diff.ps1
 
-      - name: Write the recording and its manifest
-        run: .\scripts\runner\write-manifest.ps1 -StateA out\state-a\pass1 -StateB out\state-b\pass1 -Snapshot snapshot -StateBSnapshot out\state-b-snapshot
+      - name: Assemble the recording and its manifest, and check them
+        run: |
+          .\scripts\runner\write-manifest.ps1 -Out out\recording -StateA out\state-a\pass1 -StateB out\state-b\pass1 -Snapshot snapshot -StateBSnapshot out\state-b-snapshot
+          .\scripts\runner\verify-recordings.ps1 -Dir out\recording -ThisRun
 
-      - name: Verify the manifest
-        run: .\scripts\runner\verify-recordings.ps1 -Snapshot snapshot -StateBSnapshot out\state-b-snapshot -BeforeCommit
+      - name: Diagnostics
+        if: always()
+        run: .\scripts\runner\diagnostics.ps1
+
+      - name: Stop IIS Express
+        if: always()
+        run: .\scripts\runner\stop-site.ps1
+
+      - name: Secret scan of the outputs
+        id: scan
+        if: always()
+        run: .\scripts\runner\secret-scan.ps1 -Dir out
+
+      - name: Upload the recording
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: recording
+          path: out/recording/
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload the recording passes and logs
+        if: always() && steps.scan.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: record-outputs
+          path: |
+            out/
+            !out/state-b-snapshot/
+            !out/recording/
+          if-no-files-found: warn
+
+  commit:
+    needs: record
+    if: github.event_name == 'push' || inputs.commit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write # push the recording, and add the state B snapshot to the snapshots-v1 release
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: recording
+          path: ${{ runner.temp }}/recording
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: state-b-snapshot
+          path: ${{ runner.temp }}/state-b-snapshot
+
+      - name: Put the recording in recordings/ and check it
+        shell: pwsh
+        run: |
+          . ./scripts/runner/common.ps1
+          $art = "$env:RUNNER_TEMP/recording"
+          foreach ($name in 'requests.txt', 'ignored-headers.txt', 'parity-exclusions.txt') {
+            if ((Get-FileHash "$art/$name").Hash -ne (Get-FileHash "recordings/$name").Hash) { throw "the recording was made from a different recordings/$name than this commit's" }
+          }
+          Remove-Item recordings/state-a, recordings/state-b -Recurse -Force -ErrorAction SilentlyContinue
+          Copy-Item "$art/state-a", "$art/state-b" recordings -Recurse
+          Copy-Item "$art/manifest.json" recordings/manifest.json
+          ./scripts/runner/verify-recordings.ps1 -ThisRun
+          $m = Get-Content recordings/manifest.json -Raw | ConvertFrom-Json
+          if ((Get-FolderDigest "$env:RUNNER_TEMP/state-b-snapshot") -ne $m.stateBSnapshotSha256) { throw 'the state-b-snapshot artifact does not have the digest in the manifest' }
+
+      - name: Add the state B snapshot to the snapshots-v1 release
+        shell: pwsh
+        run: |
+          . ./scripts/runner/common.ps1
+          $m = Get-Content recordings/manifest.json -Raw | ConvertFrom-Json
+          $asset = Join-Path $env:RUNNER_TEMP (Get-SnapshotAssetName 'state-b-snapshot' $m.stateBSnapshotRun)
+          tar -czf $asset -C "$env:RUNNER_TEMP/state-b-snapshot" .
+          if ($LASTEXITCODE -ne 0) { throw 'tar failed' }
+          gh release upload $SnapshotRelease $asset --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'release upload failed' }
 
       - name: Commit the recording
-        if: github.event_name == 'push' || inputs.commit
+        shell: pwsh
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
@@ -116,21 +196,3 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'rebase onto main failed' }
           git push -q origin HEAD:main
           if ($LASTEXITCODE -ne 0) { throw 'push failed' }
-
-      - name: Diagnostics
-        if: always()
-        run: .\scripts\runner\diagnostics.ps1
-
-      - name: Stop IIS Express
-        if: always()
-        run: .\scripts\runner\stop-site.ps1
-
-      - name: Upload the recording passes
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: recording
-          path: |
-            out/
-            !out/state-b-snapshot/
-          if-no-files-found: warn

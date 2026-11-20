@@ -1,5 +1,5 @@
 -- Spec 02 check 4: change the restored state A database directly, as the administrator, so that
--- answers the recordings cannot contain must come from the database. scripts/linux/mutation-check.ps1
+-- answers the recordings cannot contain must come from the database. scripts/linux/data-change-check.ps1
 -- runs this, then checks each affected response against the recording plus the change below.
 -- New rows are copies of existing rows with a few columns changed, so every other NOT NULL column
 -- holds a value the old app wrote.

@@ -4,8 +4,9 @@ name: live-parity
 # reading the same LocalDB database, must give byte-identical answers:
 #   1. state A (the seed snapshot), every recorded request
 #   2. state B (seed/state-b.txt pushed through the old app), every recorded request
-#   3. after more pushes through the old app (seed/live-parity-extra.txt), requests the committed
-#      set does not contain: scripts/live-parity-requests.txt and a seeded random set
+#   3. after more pushes through the old app (seed/live-parity-extra.txt) and distinct download
+#      counts set in the database (scripts/download-counts.sql), requests the committed set does not
+#      contain: scripts/live-parity-requests.txt and a seeded random set
 # Run at milestones and at the end, by hand.
 
 on:
@@ -13,11 +14,11 @@ on:
 
 permissions:
   contents: read
-  actions: read # download seed-snapshot
+  actions: read # download this run's service-win-x64 artifact
 
 env:
   GALLERY_SHA: 63e6ee4202b441e1c904d6f78fc7b070f36bc24f
-  SNAPSHOT_RUN_ID: '44653627352'
+  GH_TOKEN: ${{ github.token }} # get-snapshot.ps1 reads the snapshots-v1 release
   DOTNET_NOLOGO: 'true'
   DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
 
@@ -29,6 +30,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           global-json-file: service/global.json
@@ -50,6 +53,8 @@ jobs:
         shell: powershell
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Build the gallery, or restore it from cache
         uses: ./.github/actions/gallery-build
@@ -59,13 +64,8 @@ jobs:
       - name: Setup (gallery tools\Setup-DevEnvironment.ps1)
         run: .\scripts\runner\setup.ps1
 
-      - name: Download seed-snapshot
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: seed-snapshot
-          path: snapshot
-          run-id: ${{ env.SNAPSHOT_RUN_ID }}
-          github-token: ${{ github.token }}
+      - name: Download the seed snapshot and check its digest
+        run: .\scripts\runner\get-snapshot.ps1 -State a -Dir snapshot
 
       - name: Download the service
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -89,10 +89,14 @@ jobs:
         if: always()
         run: .\scripts\runner\live-compare.ps1 -Requests recordings\requests.txt -Name state-b -Exclusions recordings\parity-exclusions.txt
 
-      - name: More pushes through the old app, and requests outside the committed set
+      - name: More pushes through the old app, download counts, and requests outside the committed set
         if: always()
         run: |
-          .\scripts\runner\mutate.ps1 -List seed\live-parity-extra.txt
+          .\scripts\runner\push-extra.ps1 -List seed\live-parity-extra.txt
+          . .\scripts\runner\common.ps1
+          $set = @(Invoke-Sql (Get-Content scripts\download-counts.sql -Raw) -Database NuGetGallery)
+          if ($set.Count -ne 32) { throw "download-counts.sql set $($set.Count) counts, expected 32" }
+          Write-Summary "- download counts: 32 distinct counts set in the database (scripts/download-counts.sql)"
           .\scripts\runner\random-requests.ps1 -Seed $env:GITHUB_RUN_ID -OutFile out\random-requests.txt
           Get-Content scripts\live-parity-requests.txt, out\random-requests.txt | Set-Content out\extra-requests.txt -Encoding ascii
 
@@ -111,11 +115,12 @@ jobs:
           Get-Process GalleryReadService -ErrorAction SilentlyContinue | Stop-Process -Force
 
       - name: Secret scan of the outputs
+        id: scan
         if: always()
         run: .\scripts\runner\secret-scan.ps1 -Dir out
 
       - name: Upload outputs
-        if: always()
+        if: always() && steps.scan.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: live-parity
