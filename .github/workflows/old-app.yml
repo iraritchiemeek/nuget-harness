@@ -34,12 +34,6 @@ jobs:
       - name: Park .NET SDKs newer than 9 (runner change, not app change)
         run: .\scripts\runner\pin-dotnet-sdk.ps1
 
-      - name: Cache NuGet packages for the gallery build
-        uses: actions/cache@v4
-        with:
-          path: ~\.nuget\packages
-          key: nuget-${{ env.GALLERY_SHA }}
-
       - name: Cache seed packages downloaded from nuget.org
         uses: actions/cache@v4
         with:
@@ -47,7 +41,8 @@ jobs:
           key: seed-${{ hashFiles('seed/packages.txt') }}
 
       # The app is pinned and never edited, so its build output only changes with the SHA or the
-      # runner image. On a hit, build.ps1 is skipped entirely.
+      # runner image. On a hit, build.ps1 is skipped entirely. The EntityFramework package is
+      # included because Setup-DevEnvironment.ps1 runs ef6.exe from the NuGet package folder.
       - name: Read runner image version
         id: image
         run: Add-Content $env:GITHUB_OUTPUT "key=$env:ImageOS-$env:ImageVersion"
@@ -59,7 +54,8 @@ jobs:
           path: |
             gallery/src/NuGetGallery
             !gallery/src/NuGetGallery/obj
-          key: gallery-build-${{ env.GALLERY_SHA }}-${{ steps.image.outputs.key }}
+            ~/.nuget/packages/entityframework
+          key: gallery-build-v2-${{ env.GALLERY_SHA }}-${{ steps.image.outputs.key }}
 
       - name: Build (gallery build.ps1 -SkipJobs -SkipArtifacts)
         if: steps.buildcache.outputs.cache-hit != 'true'
@@ -72,6 +68,7 @@ jobs:
           path: |
             gallery/src/NuGetGallery
             !gallery/src/NuGetGallery/obj
+            ~/.nuget/packages/entityframework
           key: ${{ steps.buildcache.outputs.cache-primary-key }}
 
       - name: Record build source
