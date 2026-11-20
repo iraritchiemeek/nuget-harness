@@ -1,6 +1,6 @@
 # Spec 02 amendment A2: the pushes that turn state A (the spec 01 seed snapshot) into state B.
-# Real nuget.org versions of IDs already in the seed, so the flags change responses the request set
-# already covers. Format as seed/packages.txt: <Id> <normalized version as used by the nuget.org
+# Real nuget.org versions, mostly of IDs already in the seed, so the flags change responses the
+# request set already covers; the last two are new IDs (see below). Format as seed/packages.txt: <Id> <normalized version as used by the nuget.org
 # flat container>. Kept fixed; scripts/runner/push-state-b.ps1 pushes these through the old app's API.
 
 # Prerelease with a SemVer 1.0.0 label (no dots).

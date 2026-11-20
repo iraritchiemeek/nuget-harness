@@ -7,7 +7,10 @@
 # ownership request needs the current owner to accept it by signing in (exploratory record run
 # 44665262875: the first push, made before the grant, was answered 403). The one step that does not
 # go through the app is therefore a SQL row: the new account is made a co-owner of the IDs it pushes
-# (PackageRegistrationOwners). It touches no package row, and every package row comes from a push.
+# that already exist (PackageRegistrationOwners). It touches no package row, and every package row
+# comes from a push. An ID that does not exist yet (amendment A9: a new ID changes package-ids
+# answers) needs no grant: its first push creates it, owned by the pushing account. A missed grant
+# still fails, because the push is then answered 403, not 201.
 param([string]$List = (Join-Path $PSScriptRoot '..\..\seed\state-b.txt'))
 . "$PSScriptRoot\common.ps1"
 $entries = @(Get-Content $List | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') } | ForEach-Object {
@@ -19,13 +22,16 @@ $entries = @(Get-Content $List | ForEach-Object { $_.Trim() } | Where-Object { $
 $apiKey = Get-Content $ApiKeyFile -Raw
 
 $ids = (@($entries | ForEach-Object { "N'$($_.Id)'" } | Sort-Object -Unique)) -join ', '
-$granted = Invoke-Sql -Database 'NuGetGallery' -Query @"
+$granted = @(Invoke-Sql -Database 'NuGetGallery' -Query @"
 INSERT INTO [dbo].[PackageRegistrationOwners] ([PackageRegistrationKey], [UserKey])
 SELECT r.[Key], u.[Key] FROM [dbo].[PackageRegistrations] r CROSS JOIN [dbo].[Users] u
 WHERE u.[Username] = N'stateb' AND r.[Id] IN ($ids);
-SELECT @@ROWCOUNT AS n;
-"@
-if ($granted[0].n -ne @($entries.Id | Sort-Object -Unique).Count) { throw "co-ownership granted on $($granted[0].n) IDs, expected one per ID in $List" }
+SELECT r.[Id] FROM [dbo].[PackageRegistrations] r
+JOIN [dbo].[PackageRegistrationOwners] o ON o.[PackageRegistrationKey] = r.[Key]
+JOIN [dbo].[Users] u ON u.[Key] = o.[UserKey]
+WHERE u.[Username] = N'stateb';
+"@ | ForEach-Object { $_.Id })
+$newIds = @($entries.Id | Sort-Object -Unique | Where-Object { $granted -notcontains $_ })
 
 $results = @("id`tversion`tstatus")
 foreach ($e in $entries) {
@@ -36,4 +42,4 @@ foreach ($e in $entries) {
 }
 New-Item -ItemType Directory -Force -Path (Join-Path $OutDir 'state-b') | Out-Null
 Write-Utf8File (Join-Path $OutDir 'state-b\push-results.tsv') $results
-Write-Summary "- state B: pushed $($entries.Count) versions from seed/state-b.txt as account stateb (co-owner by SQL row)"
+Write-Summary "- state B: pushed $($entries.Count) versions from seed/state-b.txt as account stateb (co-owner by SQL row of $($granted.Count) IDs; new IDs created by their push: $($newIds -join ', '))"
