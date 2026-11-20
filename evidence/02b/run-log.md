@@ -120,7 +120,26 @@ A probe branch is a deliberate experiment: a throwaway branch that changes one t
 | [44689736187](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44689736187) | live-parity | `396c87d` | pass |
 | [44689693749](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44689693749), [44689704828](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44689704828), [44689715248](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44689715248), [44689725788](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44689725788) | benchmark: old app, new service, old app, new service first | `396c87d` | pass; read together in [`benchmark.md`](benchmark.md) |
 
-`396c87d` is the last code change. Later commits change only documentation.
+`396c87d` is the last change to the benchmark and workflows. After it, `8454626` adds one test, and the rest change only documentation and comments.
+
+### Every check on the final code (`f5dbc95`, or `396c87d` for the dispatched Windows runs)
+
+| Check | Result | Run |
+|---|---|---|
+| Spec 02 check 1: recordings trustworthy | pass: record with commit on, 351/351 byte-identical passes per state, bot commit `17efe10` | record [44688687862](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44688687862) |
+| Spec 02 check 2: request set coverage | the agent's judgement, not a tool check (unchanged from spec 02) | none |
+| Spec 02 check 3: matches the recordings | pass in both states: 348/348 identical (36 by status only), 199 after the SemVer rule, 3 excluded | new-service [44692845018](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44692845018) |
+| Spec 02 check 4: answers from the database | pass: 11/11 | same run |
+| Spec 02 check 5 and 02b negative control | pass: 5/5 planted faults fail, including versions out of SemVer order | same run |
+| Spec 02 check 6: live parity | pass: state A 348/348, state B 348/348 (199 after the rule each), extra 332/332 (147 after the rule) | live-parity [44689736187](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44689736187) |
+| Spec 02 check 7: writes nothing | pass in both states: 52 fingerprint lines unchanged | new-service [44692845018](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44692845018) |
+| Spec 02 check 8: quality gates | pass: 84 unit and property tests, 54 integration tests, Stryker 81.25% (break 80), lint, CodeQL; old-app checks pass | service-quality [44692844921](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44692844921), lint [44692844864](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44692844864), codeql [44692844943](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44692844943), old-app [44692844988](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44692844988) |
+| Spec 02b 1: ordering bugs | versions: approved difference, applied in checks 3, 5 and 6. Ties: fixed by registration order with no rule, as amendment B1 allows | as above |
+| Spec 02b 2: LINQ on EF Core | done; no copied EF6 SQL; all spec 02 checks pass | as above |
+| Spec 02b 3: benchmark, at least 3 runs | 4 like-for-like runs, report in [`benchmark.md`](benchmark.md) | [44689693749](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44689693749), [44689704828](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44689704828), [44689715248](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44689715248), [44689725788](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44689725788) |
+| Spec 02b 4: run log | this file | none |
+
+**Mutation score.** On `396c87d`, Stryker scored 80.36%, one mutant down on `1432eda` with no logic change. The string mutant on the health check's name (`"database"` to `""`) was killed in one run and survived in the other, because `/health` answers only its status. `8454626` adds a test that pins the name. The score on `f5dbc95` is 81.25%. The margin over the break threshold of 80 is small.
 
 ### Benchmark findings
 
