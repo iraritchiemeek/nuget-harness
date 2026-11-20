@@ -123,3 +123,10 @@ The new service currently answers these requests with ASP.NET Core's default `40
 - Done-when 6 (Windows live parity).
 - Done-when 7's before/after checksum. The read-only login is in place and shown in run 44663053674.
 - `evidence/02/parity-report.md`.
+
+### Runs not in the tables above
+
+- new-service spike and early runs, all green: [44659613592](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44659613592), [44660369348](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44660369348), [44660814677](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44660814677), [44661804808](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44661804808).
+- new-service [44662729714](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44662729714): failed. It ran on the `.gitattributes` commit, before the re-record, so verification still saw the 5 normalised files.
+- The `lint` runs this session: 6 of 6 green.
+- Totals this session (`gh run list`): old-app 9 runs (8 pass, 1 fail), record 3 (2 pass, 1 fail), new-service 8 (5 pass, 3 fail), lint 6 (6 pass).

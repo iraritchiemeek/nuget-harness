@@ -132,8 +132,10 @@ Three harness changes, each its own commit, made before spec 02 added workflow s
 | [16](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44657878210) | **pass** | 5:47 | After the AWS removal. |
 | [17](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44659613579) | **pass** | 5:36 | After the composite action and `common.ps1` refactor. Both jobs green. |
 | [18](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44660369277) | **pass** | 6:10 | After the lint fixes (function renames). Both jobs green. |
-| [19](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44660388640) | **pass** | 12:37 | `workflow_dispatch` with `skip_build_cache=true` on the same commit. Both jobs built the gallery from source, so the restore job now honours the input. |
+| [19](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44660388640) | **pass** | 12:37 | `workflow_dispatch` with `skip_build_cache=true` on the same commit. It took 12:37, against about 6 minutes for warm runs, which fits both jobs building from source. The composite action's inner steps are not shown separately in the job view, so the build in each job was not confirmed step by step. |
 
 Spec 02 then changed the shared capture format, which spec 01's checks also use (records with status and headers, `evidence/02/run-log.md`):
 - Run [20](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44660814699) failed check 5. With headers compared, the responses captured straight after `reset.ps1` restarted the app carried `Cache-Control: No-Cache`, and the seeded capture had `private`.
 - `start-site.ps1` now waits for that state to pass. Run [21](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44661804876) passed both jobs (6:15).
+
+Other old-app runs this session, all green: [44658940492](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44658940492), [44662619375](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44662619375), [44662729551](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44662729551). Run 20's `check5-reset.txt`: 26 of 179 records differed, each only in `cache-control` (`No-Cache` after reset, `private` before).
