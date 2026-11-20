@@ -1,9 +1,13 @@
 name: record
 
-# Spec 02: record the old app's answers to recordings/requests.txt. The pinned NuGetGallery runs on
-# windows-2022, restored from the seed snapshot. The request set is sent twice, and the two passes
-# must be byte-identical. Only then are the records and recordings/manifest.json committed, by
-# this workflow. Nothing else writes recordings/responses or the manifest.
+# Spec 02: record the old app's answers to recordings/requests.txt, in two data states. The pinned
+# NuGetGallery runs on windows-2022.
+#   State A: the spec 01 seed snapshot, restored.
+#   State B: state A plus the pushes in seed/state-b.txt (amendment A2), snapshotted as the
+#            state-b-snapshot artifact of this run and restored from it before recording.
+# In each state the request set is sent twice, and the two passes must be byte-identical. Only then
+# are the records and recordings/manifest.json committed, by this workflow. Nothing else writes
+# recordings/state-a, recordings/state-b or the manifest.
 
 on:
   workflow_dispatch:
@@ -14,7 +18,7 @@ on:
         default: true
   push:
     branches: [main]
-    paths: ['recordings/requests.txt', 'recordings/ignored-headers.txt']
+    paths: ['recordings/requests.txt', 'recordings/ignored-headers.txt', 'recordings/parity-exclusions.txt', 'seed/state-b.txt']
 
 permissions:
   contents: read
@@ -60,11 +64,43 @@ jobs:
       - name: Restore the snapshot and start the app
         run: .\scripts\runner\reset.ps1 -Dir snapshot
 
-      - name: Record twice and compare the passes
+      - name: 'State A: record twice and compare the passes'
         run: |
-          .\scripts\runner\capture.ps1 -Requests recordings\requests.txt -Dir out\pass1
-          .\scripts\runner\capture.ps1 -Requests recordings\requests.txt -Dir out\pass2
-          .\scripts\runner\compare.ps1 -Before out\pass1 -After out\pass2 -CheckNumber 1 -Name 'two recording passes are byte-identical' -OutName record-passes.txt
+          .\scripts\runner\capture.ps1 -Requests recordings\requests.txt -Dir out\state-a\pass1
+          .\scripts\runner\capture.ps1 -Requests recordings\requests.txt -Dir out\state-a\pass2
+          .\scripts\runner\compare.ps1 -Before out\state-a\pass1 -After out\state-a\pass2 -CheckNumber 1 -Name 'state A: two recording passes are byte-identical' -OutName record-passes-a.txt
+
+      - name: 'State B: push seed/state-b.txt through the old app, snapshot, restore'
+        run: |
+          .\scripts\runner\push-state-b.ps1
+          .\scripts\runner\snapshot.ps1 -Dir out\state-b-snapshot
+          .\scripts\runner\secret-scan.ps1 -Dir out\state-b-snapshot
+          .\scripts\runner\reset.ps1 -Dir out\state-b-snapshot
+
+      - name: Upload the state B snapshot
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: state-b-snapshot
+          path: out/state-b-snapshot/
+          if-no-files-found: error
+
+      - name: 'State B: record twice and compare the passes'
+        run: |
+          .\scripts\runner\capture.ps1 -Requests recordings\requests.txt -Dir out\state-b\pass1
+          .\scripts\runner\capture.ps1 -Requests recordings\requests.txt -Dir out\state-b\pass2
+          .\scripts\runner\compare.ps1 -Before out\state-b\pass1 -After out\state-b\pass2 -CheckNumber 1 -Name 'state B: two recording passes are byte-identical' -OutName record-passes-b.txt
+
+      - name: EXPLORE LocalDB SQL login
+        continue-on-error: true
+        run: |
+          . .\scripts\runner\common.ps1
+          $pw = 'Pw1-' + [guid]::NewGuid().ToString('N')
+          Write-Host "::add-mask::$pw"
+          Invoke-Sql "CREATE LOGIN [reader] WITH PASSWORD = N'$pw', CHECK_POLICY = OFF" | Out-Null
+          Invoke-Sql -Database NuGetGallery "CREATE USER [reader] FOR LOGIN [reader]; ALTER ROLE [db_datareader] ADD MEMBER [reader];" | Out-Null
+          Invoke-Sql "SELECT SERVERPROPERTY('IsIntegratedSecurityOnly') AS i" | ForEach-Object { Write-Host "IsIntegratedSecurityOnly=$($_.i)" }
+          $c = New-Object System.Data.SqlClient.SqlConnection "Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=NuGetGallery;User Id=reader;Password=$pw;Pooling=False"
+          $c.Open(); $cmd = $c.CreateCommand(); $cmd.CommandText = 'SELECT COUNT(*) FROM dbo.Packages'; Write-Host "reader sees $($cmd.ExecuteScalar()) packages"; $c.Close()
 
       - name: Save the SQL the old app sent (from the plan cache)
         run: .\scripts\runner\dump-sql.ps1 -OutFile out\old-app-sql.txt
@@ -73,17 +109,17 @@ jobs:
         run: .\scripts\runner\source-diff.ps1
 
       - name: Write the recording and its manifest
-        run: .\scripts\runner\write-manifest.ps1 -From out\pass1 -Snapshot snapshot
+        run: .\scripts\runner\write-manifest.ps1 -StateA out\state-a\pass1 -StateB out\state-b\pass1 -Snapshot snapshot -StateBSnapshot out\state-b-snapshot
 
       - name: Verify the manifest
-        run: .\scripts\runner\verify-recordings.ps1 -Snapshot snapshot -BeforeCommit
+        run: .\scripts\runner\verify-recordings.ps1 -Snapshot snapshot -StateBSnapshot out\state-b-snapshot -BeforeCommit
 
       - name: Commit the recording
         if: github.event_name == 'push' || inputs.commit
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add recordings/responses recordings/manifest.json
+          git add -A recordings/responses recordings/state-a recordings/state-b recordings/manifest.json
           git diff --cached --quiet
           if ($LASTEXITCODE -eq 0) { Write-Host 'recording unchanged; nothing to commit'; exit 0 }
           git commit -q -m "Record the old app's responses (run $env:GITHUB_RUN_ID)" -m "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
@@ -105,5 +141,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: recording
-          path: out/
+          path: |
+            out/
+            !out/state-b-snapshot/
           if-no-files-found: warn

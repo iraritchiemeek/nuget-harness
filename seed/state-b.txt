@@ -1,0 +1,15 @@
+# Spec 02 amendment A2: the pushes that turn state A (the spec 01 seed snapshot) into state B.
+# Real nuget.org versions of IDs already in the seed, so the flags change responses the request set
+# already covers. Format as seed/packages.txt: <Id> <normalized version as used by the nuget.org
+# flat container>. Kept fixed; scripts/runner/push-state-b.ps1 pushes these through the old app's API.
+
+# Prerelease with a SemVer 1.0.0 label (no dots).
+Serilog 4.4.1-dev-02453
+# Prerelease with a dotted label, so SemVer 2.0.0.
+Polly 8.0.0-beta.2
+# Dotted prerelease of a seeded stable version (xunit 2.5.2).
+xunit 2.5.2-pre.6
+# The nuspec says 8.4.0+build.694: stable, with build metadata, so SemVer 2.0.0.
+Serilog.Exceptions 8.4.0
+# The nuspec says 3.3.0-ci.15+sha.f4793a7: dotted prerelease with build metadata.
+Ninject 3.3.0-ci.15

@@ -12,9 +12,6 @@
 #   Web.config                                     httpRuntime requestPathInvalidCharacters, relaxedUrlToFileSystemMapping
 #
 # Not sent, on purpose:
-# - a blank package-versions id such as /api/v2/package-versions/%20. The query throws, and because the
-#   recording client is local (Request.IsLocal) the 500 body is the exception's stack trace, with file paths and
-#   line numbers of the machine that built the gallery. That is not a response a service can or should reproduce.
 # - path characters in requestPathInvalidCharacters (< > * % : \ ?) and encoded slashes. ASP.NET and IIS reject them
 #   before the app runs, and answer local clients with a detailed error page that includes the server's file paths.
 # - a path that matches neither route, such as /api/v2/package-versions/Serilog/extra. It never reaches these two
@@ -303,3 +300,48 @@ GET /api/v2/package-versions/Serilog%20
 POST /api/v2/package-ids?partialId=Serilog
 DELETE /api/v2/package-versions/Serilog
 PUT /api/v2/package-versions/Serilog
+
+# Blank and whitespace IDs and prefixes (spec 02 amendment A3). Source: AutocompleteDatabasePackageVersionsQuery.cs
+# (string.IsNullOrWhiteSpace(id) throws ArgumentNullException), AutocompleteDatabasePackageIdsQuery.cs (a blank
+# partialId asks for the most-downloaded IDs). An empty {id} segment matches no route (Routes.cs), so it is not sent.
+GET /api/v2/package-versions/%20
+GET /api/v2/package-versions/%20%20
+GET /api/v2/package-versions/%20Serilog
+GET /api/v2/package-ids?partialId=%09
+GET /api/v2/package-ids?partialId=%20%20
+GET /api/v2/package-ids?partialId=%20Serilog
+GET /api/v2/package-ids?partialId=Serilog%20
+
+# Characters with a meaning in SQL LIKE, in prefixes and IDs (A3). Source: StartsWith in
+# AutocompleteDatabasePackageIdsQuery.cs, which Entity Framework 6 turns into LIKE ... ESCAPE N'~';
+# the version query compares with = (AutocompleteDatabasePackageVersionsQuery.cs)
+GET /api/v2/package-ids?partialId=Seri%25og
+GET /api/v2/package-ids?partialId=Seri%5Blo%5Dog
+GET /api/v2/package-ids?partialId=Seri%5B%5Ex%5Dog
+GET /api/v2/package-ids?partialId=Serilog%5D
+GET /api/v2/package-ids?partialId=Serilog.Sinks.%5B
+GET /api/v2/package-ids?partialId=~
+GET /api/v2/package-ids?partialId=~%25
+GET /api/v2/package-ids?partialId=Seri~log
+GET /api/v2/package-versions/Seri_og
+GET /api/v2/package-versions/Serilog%5B
+GET /api/v2/package-versions/Serilog~
+
+# The IDs that state B adds versions to (seed/state-b.txt, A2), with the flags on both endpoints. In state B these
+# show prerelease, dotted prerelease and build metadata (+) versions. Source: ApiController.cs, SemVerLevelKey.cs
+GET /api/v2/package-versions/Polly?includePrerelease=true
+GET /api/v2/package-versions/Polly?semVerLevel=2.0.0
+GET /api/v2/package-versions/Polly?includePrerelease=true&semVerLevel=2.0.0
+GET /api/v2/package-versions/xunit?includePrerelease=true
+GET /api/v2/package-versions/xunit?semVerLevel=2.0.0
+GET /api/v2/package-versions/xunit?includePrerelease=true&semVerLevel=2.0.0
+GET /api/v2/package-versions/Serilog.Exceptions?includePrerelease=true
+GET /api/v2/package-versions/Serilog.Exceptions?semVerLevel=2.0.0
+GET /api/v2/package-versions/Serilog.Exceptions?includePrerelease=true&semVerLevel=2.0.0
+GET /api/v2/package-versions/Ninject?includePrerelease=true
+GET /api/v2/package-versions/Ninject?semVerLevel=2.0.0
+GET /api/v2/package-versions/Ninject?includePrerelease=true&semVerLevel=2.0.0
+GET /api/v2/package-ids?partialId=Ninject&includePrerelease=true&semVerLevel=2.0.0
+GET /api/v2/package-ids?partialId=xunit&includePrerelease=true&semVerLevel=2.0.0
+GET /api/v2/package-ids?partialId=Serilog.Exceptions&semVerLevel=2.0.0
+GET /api/v2/package-versions/Serilog+Sinks

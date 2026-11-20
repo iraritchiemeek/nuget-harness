@@ -1,0 +1,12 @@
+# Recorded requests left out of the new service's parity checks (spec 02 checks 3 and 6), one per
+# line: the request line, then the reason. compare.ps1 refuses a GET here, and refuses a line that
+# is not in the request set. Every other recorded request is compared byte for byte.
+#
+# Spec 02 amendment A1: methods other than GET stay with the old app. It answers them with ASP.NET's
+# developer-detail 404 page (the recorder is a local client), which embeds the framework build and a
+# stack trace. The new service answers 405 with Allow: GET, pinned by a test in service/test. The
+# next spec's proxy routes only GET on these paths to the new service, and its parity check covers
+# these requests end to end.
+POST /api/v2/package-ids?partialId=Serilog  A1: non-GET, routed to the old app by the next spec's proxy
+DELETE /api/v2/package-versions/Serilog  A1: non-GET, routed to the old app by the next spec's proxy
+PUT /api/v2/package-versions/Serilog  A1: non-GET, routed to the old app by the next spec's proxy

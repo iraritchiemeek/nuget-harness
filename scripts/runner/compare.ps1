@@ -4,8 +4,12 @@
 # -Before is the expected side (for spec 02, the old app's recordings) and -After the actual side.
 # With -Changed (spec 01 check 5) the change in between must also have altered at least one record,
 # so that the comparison is not vacuous.
+# -Exclusions names a file of requests that are left out of the comparison (spec 02 amendment A1),
+# one per line: the request line, then the reason. Each one must be a recorded request, and none may
+# be a GET. The report lists them, so an exclusion is never silent.
 param([Parameter(Mandatory)] [string]$Before, [string]$Changed, [Parameter(Mandatory)] [string]$After,
-      [int]$CheckNumber = 5, [string]$Name = 'reset is exact', [string]$OutName = 'check5-reset.txt')
+      [int]$CheckNumber = 5, [string]$Name = 'reset is exact', [string]$OutName = 'check5-reset.txt',
+      [string]$Exclusions)
 . "$PSScriptRoot\common.ps1"
 $checkDir = Join-Path $OutDir 'checks'
 New-Item -ItemType Directory -Force -Path $checkDir | Out-Null
@@ -37,7 +41,21 @@ $b = Get-DirectoryHash $Before; $a = Get-DirectoryHash $After
 $c = if ($Changed) { Get-DirectoryHash $Changed } else { @{} }
 $records = @(@($b.Keys) + @($a.Keys) | ForEach-Object { [IO.Path]::GetFileNameWithoutExtension($_) } | Sort-Object -Unique)
 $report = @(); $differ = 0; $changedCount = 0
+
+$excluded = @{}
+if ($Exclusions) {
+    foreach ($line in Get-Content $Exclusions | Where-Object { $_.Trim() -and -not $_.StartsWith('#') }) {
+        if ($line -notmatch '^(\S+ \S+)\s+(\S.*)$') { throw "exclusion without a reason: $line" }
+        $request = $Matches[1]; $reason = $Matches[2]
+        if ($request.StartsWith('GET ')) { throw "a GET request cannot be excluded: $request" }
+        $r = Get-RecordName $request
+        if ($records -notcontains $r) { throw "exclusion is not a recorded request: $request" }
+        $excluded[$r] = $true
+        $report += "EXCLUDED   $r  $request  ($reason)"
+    }
+}
 foreach ($r in $records) {
+    if ($excluded.ContainsKey($r)) { continue }
     if ($Changed -and -not (Test-SameRecord $b $c $r)) { $changedCount++ }
     if (Test-SameRecord $b $a $r) { continue }
     $differ++
@@ -53,13 +71,14 @@ foreach ($r in $records) {
         $report += "    body actual    $(Format-Body (Join-Path $After "$r.body"))"
     }
 }
-$summary = @("records: $($records.Count)", "different: $differ")
+$compared = $records.Count - $excluded.Count
+$summary = @("records: $($records.Count)", "excluded: $($excluded.Count)", "different: $differ")
 if ($Changed) { $summary += "changed by the mutation: $changedCount" }
 @($summary + $report) | Set-Content (Join-Path $checkDir $OutName) -Encoding utf8
 $report | Select-Object -First 60 | Write-Host
 
-$ok = ($differ -eq 0) -and ($records.Count -gt 0) -and ((-not $Changed) -or ($changedCount -gt 0))
-$detail = "$($records.Count - $differ)/$($records.Count) records identical" + $(if ($Changed) { "; the mutation changed $changedCount" } else { '' }) + " ($OutName)"
+$ok = ($differ -eq 0) -and ($compared -gt 0) -and ((-not $Changed) -or ($changedCount -gt 0))
+$detail = "$($compared - $differ)/$compared records identical" + $(if ($excluded.Count) { ", $($excluded.Count) excluded" } else { '' }) + $(if ($Changed) { "; the mutation changed $changedCount" } else { '' }) + " ($OutName)"
 Write-Result $CheckNumber $Name $ok $detail
 Write-Summary "- $Name`: $(if ($ok) {'pass'} else {'FAIL'}) - $detail"
 if (-not $ok) { throw "$Name`: failed" }
