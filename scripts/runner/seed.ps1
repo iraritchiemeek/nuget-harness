@@ -111,7 +111,9 @@ $code = Invoke-FormPost $generateUrl @{
     '__RequestVerificationToken' = $form.Token
     'description' = 'seed'
     'owner' = $username
-    'expirationInDays' = '365'
+    # Not 365: with the ApiKeyReduction flag on (shipped flags.json), keys lasting over 30 days are
+    # treated as expiring at 2026-11-01, so a 365-day key is born expired (run 7: every push got 403).
+    'expirationInDays' = '8'
 } $resp @('scopes=package%3Apush', 'scopes=package%3Apushversion', 'subjects=*')
 Write-Host "GenerateApiKey POST -> $code"
 if ($code -ne 200) { throw "GenerateApiKey returned ${code}: $((Get-Content $resp -Raw) -replace '[A-Za-z0-9]{40,}', '<redacted>')" }
