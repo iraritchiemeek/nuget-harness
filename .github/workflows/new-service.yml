@@ -122,10 +122,12 @@ jobs:
           ./scripts/runner/verify-recordings.ps1 -Snapshot "$env:RUNNER_TEMP/snapshot"
           Move-Item recordings "$env:RUNNER_TEMP/recordings"
 
-      - name: Publish the service and its container image
+      - name: Publish the service and its container image (from service/, so service/global.json picks the SDK)
+        working-directory: service
         run: |
-          dotnet publish service/src/GalleryReadService -c Release -o "$RUNNER_TEMP/publish"
-          dotnet publish service/src/GalleryReadService -c Release /t:PublishContainer -p:ContainerImageTag=check4
+          dotnet --version
+          dotnet publish src/GalleryReadService -c Release -o "$RUNNER_TEMP/publish"
+          dotnet publish src/GalleryReadService -c Release --os linux --arch x64 /t:PublishContainer -p:ContainerImageTag=check4
 
       - name: Check 4, first half (no recording in the build output or the image)
         run: scripts/linux/no-recordings-in-build.sh "$RUNNER_TEMP/recordings" "$RUNNER_TEMP/publish" gallery-read-service:check4

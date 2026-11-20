@@ -46,10 +46,11 @@ runs:
       with:
         global-json-file: service/global.json
 
-    - name: Publish the service
+    - name: Publish the service (from service/, so service/global.json picks the SDK)
       if: inputs.start-service == 'true'
       shell: bash
-      run: dotnet publish service/src/GalleryReadService -c Release -o "$RUNNER_TEMP/publish"
+      working-directory: service
+      run: dotnet publish src/GalleryReadService -c Release -o "$RUNNER_TEMP/publish"
 
     - name: Start the service as the read-only login
       if: inputs.start-service == 'true'

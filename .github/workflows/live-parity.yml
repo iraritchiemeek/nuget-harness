@@ -32,7 +32,9 @@ jobs:
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           global-json-file: service/global.json
-      - run: dotnet publish service/src/GalleryReadService -c Release -r win-x64 --self-contained -o "$RUNNER_TEMP/service"
+      - name: Publish (from service/, so service/global.json picks the SDK)
+        working-directory: service
+        run: dotnet publish src/GalleryReadService -c Release -r win-x64 --self-contained -o "$RUNNER_TEMP/service"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: service-win-x64
