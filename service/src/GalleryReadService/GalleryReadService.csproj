@@ -3,6 +3,10 @@
     <!-- Container: built with dotnet publish /t:PublishContainer, on a chiseled, non-root image,
          pinned by digest (the 10.0-noble-chiseled-extra manifest list). The -extra flavour carries
          ICU, which Microsoft.Data.SqlClient needs: it refuses to run in globalization-invariant mode. -->
+    <!-- Restored for both, so locked-mode restore covers them: linux-x64 for the container, and
+         win-x64 for the Windows live-parity run, which gets a self-contained build because the
+         gallery build on that runner parks every .NET SDK above 9. -->
+    <RuntimeIdentifiers>linux-x64;win-x64</RuntimeIdentifiers>
     <ContainerRepository>gallery-read-service</ContainerRepository>
     <ContainerBaseImage>mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra@sha256:cae5b962bfb786606def03d250c6a645cc98839095c89e806e4bd8978a68115b</ContainerBaseImage>
   </PropertyGroup>
