@@ -174,3 +174,37 @@ Service quality: service-quality ran on every push. Stryker scored 90.91% with b
 ### Open
 
 - The two whitespace-ID records (`parity-report.md`, "Open decision"). Checks 3 and 6 stay red on them alone.
+
+## 2026-11-20 (UTC): session 5
+
+Work by a Claude Code agent session (session 5), after the human added amendment A4 to the spec. Final counts per check: `evidence/02/parity-report.md`.
+
+### A4 applied
+
+- **The service** answers a whitespace-only id with an empty `404`, the status IIS gives the old app's requests (both recorded records: `status: 404`, in both states). Before, it answered `500`, the old controller's answer to a blank id, which IIS never lets through. Pinned by `A_blank_id_is_not_found_with_an_empty_body` (status, no content type, empty body, gallery headers) for `%20` and `%20%20`.
+- **The exclusions file** now gives each entry a mode: `excluded` (the three A1 entries, unchanged in meaning) or `status-only` (the two A4 entries). `compare.ps1` compares only the `status:` lines of a `status-only` record, counts it as compared, and fails if either side's record or status line is missing. It still refuses a GET in mode `excluded`, an unknown mode and a stale entry. Tried locally against copies of `recordings/state-a`: a changed body on a listed record passes; a changed status, a deleted record, and a changed body on an unlisted record each fail; each malformed entry throws.
+- **Re-record.** Pushing the exclusions file ran the recording workflow ([44670190089](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44670190089)). Its commit changed only `recordings/manifest.json`: the run links, the state-B snapshot digest and the exclusions file hash. Every recorded byte is unchanged.
+
+### Runs
+
+| Run | Workflow | Result | What happened | Change that followed |
+|---|---|---|---|---|
+| [44670190089](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44670190089) | record | **pass** | The current recording. Checks 1 and 2. | |
+| [44670190106](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44670190106) | new-service | fail, expected | Ran on the push that changed the exclusions file, before the re-record: the manifest's hash of the file was stale. | None needed |
+| [44670831746](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44670831746) | new-service | fail (check 5 only) | Checks 3, 4 and 7 pass. Check 5 failed because `negative-control.ps1` reads the report's `DIFFERENT` lines, and `compare.ps1` had widened their spacing. | Restored the report's line format |
+| [44670834825](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44670834825) | live-parity | pass | State A 292/292, state B 292/292, extra 327/327, on the commit before the format fix. | |
+| [44671063641](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44671063641) | new-service | **pass** | Checks 3, 4, 5, 7 on the final code, both states. | |
+| [44671299999](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44671299999) | live-parity | **pass** | Check 6 on the final code. | |
+| [44671063765](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44671063765) | service-quality | **pass** | 45 unit, 26 integration tests, Stryker 90.91%. | |
+| [44670434468](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44670434468) | service-quality (branch `gate-proof-format`, deleted) | fail, intended | Gate proof: CSharpier failed on a collapsed `Program.cs`. Mutation testing passed. | |
+| [44670438414](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44670438414) | service-quality (branch `gate-proof-mutation`, deleted) | fail, intended | Gate proof: with five of seven test files removed, Stryker scored 3.03% and failed the break threshold of 80. The other gates passed. | |
+| [44668156090](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44668156090) | old-app (session 4) | pass on rerun | Attempt 1 failed in `restore-on-fresh-machine` (LocalDB "SQL Server process failed to start"); attempt 2 passed. | |
+| [44671063570](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44671063570) | old-app | **pass** on attempt 2 | Job `old-app` (old app checks, empty source diff) passed. Job `restore-on-fresh-machine` failed on attempt 1 at LocalDB startup, as in 44668156090, and passed when rerun. | |
+
+**The LocalDB start flake.** Across the old-app workflow's history, the `restore-on-fresh-machine` job has run 22 times, counting reruns. It failed twice, both times the same way: LocalDB "SQL Server process failed to start" inside the gallery's own `Setup-DevEnvironment.ps1` (44668156090 attempt 1, 44671063570 attempt 1). Both passed when rerun, and every other attempt started LocalDB. The failing script is the old app's, so it is not changed. No automatic retry was added: it would also hide a real setup fault. If the rate grows, a harness step that starts LocalDB before the gallery's setup is the place to look.
+
+### Decisions
+
+- **Status-only compares the status line only,** as A4 and the mode's name say. Comparing the other headers would be stricter, and they match today, but IIS's error-page headers are as much a host artefact as its body.
+- **404 for every whitespace-only id.** The service uses `string.IsNullOrWhiteSpace`, so ids of tabs or other whitespace also get `404`. Only spaces are recorded; what IIS does with, say, `%09` is not known.
+- **Report format kept.** `negative-control.ps1` matches `DIFFERENT  <record>  <request>` exactly, so new lines follow the old two-space layout.
