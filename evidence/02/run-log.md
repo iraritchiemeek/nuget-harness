@@ -210,4 +210,4 @@ Work by a Claude Code agent session (session 5), after the human added amendment
 - **404 for every whitespace-only id.** The service uses `string.IsNullOrWhiteSpace`, so ids of tabs or other whitespace also get `404`. Only spaces are recorded; what IIS does with, say, `%09` is not known.
 - **Report format kept.** `negative-control.ps1` matches `DIFFERENT  <record>  <request>` exactly, so new lines follow the old two-space layout.
 
-Session 5 total: 15 workflow runs before the evidence commits (16 attempts with the rerun), all in the table above; each evidence commit also ran lint (passed).
+Session 5 total: 16 workflow runs before the evidence commits (17 attempts with the rerun): the table above, plus codeql [44671063554](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44671063554) and lint [44671063449](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44671063449) on the final code, both passed. Each evidence commit also ran lint, which passed.
