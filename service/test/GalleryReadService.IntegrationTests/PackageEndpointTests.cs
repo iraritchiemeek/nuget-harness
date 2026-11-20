@@ -1,4 +1,7 @@
 using System.Net;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Options;
 
 namespace GalleryReadService.IntegrationTests;
 
@@ -226,5 +229,15 @@ public sealed class PackageEndpointTests(GalleryDatabase database) : IAsyncDispo
                 TestContext.Current.CancellationToken
             )
         );
+    }
+
+    [Fact]
+    public void Health_has_one_check_named_database()
+    {
+        // The name is what a failing check reports under; /health itself answers only its status.
+        var registrations = _app
+            .Services.GetRequiredService<IOptions<HealthCheckServiceOptions>>()
+            .Value.Registrations;
+        Assert.Equal("database", Assert.Single(registrations).Name);
     }
 }
