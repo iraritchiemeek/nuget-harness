@@ -1,0 +1,33 @@
+# Prefixes for the package-ids check (GET /api/v2/package-ids?partialId=<prefix>).
+# Each must match between 1 and 29 seeded IDs, because the endpoint returns at most 30.
+Serilog
+Serilog.Sinks
+Serilog.Enrichers
+Newtonsoft
+xunit
+xunit.extensibility
+NUnit
+Polly
+AutoMapper
+Fluent
+FluentValidation
+Dapper
+MediatR
+Moq
+Humanizer
+NodaTime
+RestSharp
+Castle
+Autofac
+Microsoft.Extensions.Logging
+Microsoft.Extensions.Configuration
+Microsoft.Extensions.DependencyInjection
+System.Collections
+System.Text
+Swashbuckle
+Hangfire
+Quartz
+NLog
+Nito
+Refit
+AutoFixture

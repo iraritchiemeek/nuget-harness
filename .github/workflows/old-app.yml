@@ -1,9 +1,14 @@
 name: old-app
 
+# Spec 01: build, set up and run the pinned NuGetGallery on a fresh windows-2022 runner,
+# seed it with real packages through its own UI forms and push API, run the done-when
+# checks, snapshot the seeded state, and prove that reset gives byte-identical responses.
+
 on:
   workflow_dispatch:
   push:
     branches: [main]
+    paths-ignore: ['**.md', 'specs/**']
 
 env:
   GALLERY_SHA: 63e6ee4202b441e1c904d6f78fc7b070f36bc24f
@@ -29,6 +34,18 @@ jobs:
       - name: Park .NET SDKs newer than 9 (runner change, not app change)
         run: .\scripts\runner\pin-dotnet-sdk.ps1
 
+      - name: Cache NuGet packages for the gallery build
+        uses: actions/cache@v4
+        with:
+          path: ~\.nuget\packages
+          key: nuget-${{ env.GALLERY_SHA }}
+
+      - name: Cache seed packages downloaded from nuget.org
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}\seed-packages
+          key: seed-${{ hashFiles('seed/packages.txt') }}
+
       - name: Build (gallery build.ps1 -SkipJobs -SkipArtifacts)
         run: .\scripts\runner\build.ps1
 
@@ -38,17 +55,55 @@ jobs:
       - name: Start IIS Express and wait for the app
         run: .\scripts\runner\start-site.ps1
 
-      - name: Save auth form markup
-        run: .\scripts\runner\fetch-forms.ps1
+      - name: Seed (register, create API key, push packages)
+        id: seed
+        run: .\scripts\runner\seed.ps1
+
+      - name: Checks 1-3 (package-ids, package-versions, live)
+        run: |
+          .\scripts\runner\capture.ps1 -Dir out\responses\seeded
+          .\scripts\runner\check.ps1 -Dir out\responses\seeded
+
+      - name: Snapshot (database backups + package store)
+        run: .\scripts\runner\snapshot.ps1 -Dir out\snapshot
+
+      - name: Upload snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: seed-snapshot
+          path: out/snapshot/
+          if-no-files-found: error
+
+      - name: Check 5 (change state, reset, compare bytes)
+        run: |
+          .\scripts\runner\mutate.ps1
+          .\scripts\runner\capture.ps1 -Dir out\responses\changed
+          .\scripts\runner\reset.ps1 -Dir out\snapshot
+          .\scripts\runner\capture.ps1 -Dir out\responses\reset
+          .\scripts\runner\compare.ps1 -Before out\responses\seeded -Changed out\responses\changed -After out\responses\reset
+
+      - name: Check 7 (source and config diff)
+        if: always()
+        run: .\scripts\runner\source-diff.ps1
+
+      - name: Summary
+        if: always()
+        run: .\scripts\runner\summary.ps1 -SeedOutcome '${{ steps.seed.outcome }}' -JobStatus '${{ job.status }}'
 
       - name: Diagnostics
         if: always()
         run: .\scripts\runner\diagnostics.ps1
 
-      - name: Upload outputs
+      - name: Stop IIS Express
+        if: always()
+        run: .\scripts\runner\stop-site.ps1
+
+      - name: Upload check outputs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: spike-out
-          path: out/
+          name: check-outputs
+          path: |
+            out/
+            !out/snapshot/
           if-no-files-found: warn

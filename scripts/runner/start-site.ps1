@@ -6,15 +6,24 @@ param([int]$TimeoutSeconds = 600)
 $iisx = Join-Path (Get-IISExpressDir) 'iisexpress.exe'
 $logDir = Join-Path $OutDir 'iisexpress'
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
-$p = Start-Process -FilePath $iisx -ArgumentList "/site:`"$SiteName`"" -PassThru -WindowStyle Hidden `
-    -RedirectStandardOutput (Join-Path $logDir 'stdout.log') -RedirectStandardError (Join-Path $logDir 'stderr.log')
+# The Actions runner kills processes a step leaves behind when the step ends (run 3: the app
+# answered, then refused connections in the next step). Create IIS Express through WMI so it is
+# not part of the step's process tree and outlives the step. Pass /config explicitly, because a
+# WMI-created process does not get this step's environment.
+$config = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'IISExpress\config\applicationhost.config'
+if (-not (Test-Path $config)) { throw "applicationhost.config not found at $config" }
+$cmdLine = "cmd.exe /c `"`"$iisx`" /config:`"$config`" /site:`"$SiteName`" > `"$logDir\stdout.log`" 2> `"$logDir\stderr.log`"`""
+$r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $cmdLine }
+if ($r.ReturnValue -ne 0) { throw "Win32_Process.Create returned $($r.ReturnValue)" }
+Start-Sleep -Seconds 3
+$p = Get-Process iisexpress -ErrorAction SilentlyContinue | Select-Object -First 1
+if (-not $p) { throw "iisexpress is not running after start. stdout: $(Get-Content $logDir\stdout.log -Raw -ErrorAction SilentlyContinue)" }
 Write-Host "iisexpress pid $($p.Id)"
-$p.Id | Set-Content (Join-Path $OutDir 'iisexpress.pid')
 
 $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
 $probe = Join-Path $OutDir 'start-probe.txt'
 while ((Get-Date) -lt $deadline) {
-    if ($p.HasExited) { throw "iisexpress exited with code $($p.ExitCode)" }
+    if (-not (Get-Process -Id $p.Id -ErrorAction SilentlyContinue)) { throw "iisexpress exited. stdout: $(Get-Content $logDir\stdout.log -Raw -ErrorAction SilentlyContinue)" }
     $r = Invoke-Curl -Path '/api/v2/package-ids?partialId=a' -OutFile $probe
     Write-Host "$(Get-Date -Format o) probe status $($r.Status)"
     if ($r.Status -eq 200) {

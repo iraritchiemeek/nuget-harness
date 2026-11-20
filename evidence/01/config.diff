@@ -1,0 +1,10 @@
+# Config changes made to NuGetGallery at 63e6ee4202b441e1c904d6f78fc7b070f36bc24f, one reason per change.
+# The runner workflow asserts on every run that `git diff HEAD` in the gallery checkout is empty
+# and that this file holds no diff hunks (done-when 7).
+#
+# None. The app runs on its shipped Web.config and global.json.
+#
+# Runner-side adjustments (not app config, recorded here for completeness):
+# - .NET SDKs with major version above 9 are moved out of C:\Program Files\dotnet\sdk for the run
+#   (scripts/runner/pin-dotnet-sdk.ps1). The gallery's global.json rolls forward to the newest SDK,
+#   and on windows-2022 that SDK needs MSBuild 18.7 while VS 2022 has MSBuild 17.14.

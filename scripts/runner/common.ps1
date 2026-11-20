@@ -54,3 +54,12 @@ function Invoke-Sql {
         return ,$rows
     } finally { $conn.Close() }
 }
+
+# Record one done-when result; summary.ps1 renders them as a table at the end of the run.
+function Write-Result([int]$N, [string]$Name, [bool]$Pass, [string]$Detail) {
+    $d = Join-Path $OutDir 'checks'
+    New-Item -ItemType Directory -Force -Path $d | Out-Null
+    $r = if ($Pass) { 'pass' } else { 'FAIL' }
+    Add-Content -Path (Join-Path $d 'results.tsv') -Value "$N`t$Name`t$r`t$Detail" -Encoding utf8
+    Write-Host "check $N ($Name): $r - $Detail"
+}
