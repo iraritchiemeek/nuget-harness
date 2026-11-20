@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "isRoot": true,
+  "tools": {
+    "csharpier": {
+      "version": "1.4.0",
+      "commands": ["csharpier"],
+      "rollForward": false
+    },
+    "dotnet-stryker": {
+      "version": "5.1.0",
+      "commands": ["dotnet-stryker"],
+      "rollForward": false
+    }
+  }
+}

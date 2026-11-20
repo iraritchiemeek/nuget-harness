@@ -1,0 +1,33 @@
+# Analyzer severities and code-style preferences for service/. A rule is raised or lowered only
+# here, with the reason next to it (docs/engineering-standards.md). CSharpier owns layout.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+
+[*.cs]
+# Style the build enforces (EnforceCodeStyleInBuild).
+csharp_style_namespace_declarations = file_scoped:warning
+dotnet_diagnostic.IDE0161.severity = warning
+# Unused usings.
+dotnet_diagnostic.IDE0005.severity = warning
+csharp_style_var_for_built_in_types = true:silent
+csharp_style_var_when_type_is_apparent = true:silent
+
+# Every string comparison and every formatting call states its comparison or culture.
+dotnet_diagnostic.CA1307.severity = error
+dotnet_diagnostic.CA1309.severity = error
+dotnet_diagnostic.CA1310.severity = error
+dotnet_diagnostic.CA1311.severity = error
+dotnet_diagnostic.MA0074.severity = error
+dotnet_diagnostic.MA0075.severity = error
+
+# Raised: async and disposal mistakes.
+dotnet_diagnostic.CA2007.severity = none # ASP.NET Core has no SynchronizationContext, so ConfigureAwait(false) adds noise without effect.
+dotnet_diagnostic.MA0004.severity = none # Same rule as CA2007, from Meziantou.Analyzer.
+
+[test/**.cs]
+# xUnit test method names describe behaviour with underscores (docs/engineering-standards.md, Tests).
+dotnet_diagnostic.CA1707.severity = none
