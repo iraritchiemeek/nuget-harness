@@ -1,7 +1,0 @@
-key-055df88ca1ce04013
-[2026-11-19T23:50:58Z] imported key pair nuget-harness
-[2026-11-19T23:51:01Z] created security group sg-08d3d07984aa44233
-[2026-11-19T23:51:02Z] security group sg-08d3d07984aa44233: inbound tcp/22 from <my-ip>/32 only
-[2026-11-19T23:51:04Z] launching t3.large from ami-0dcf85379b0471a5d (root /dev/sda1, 100 GB gp3)
-
-aws: [ERROR]: An error occurred (Unsupported) when calling the RunInstances operation: ED25519 key pairs are not supported with Windows AMIs. Choose a different key pair type and try again.

@@ -1,5 +1,5 @@
-[2026-11-19T23:52:16Z] security group sg-08d3d07984aa44233: inbound tcp/22 from <my-ip>/32 only
-[2026-11-19T23:52:18Z] launching t3.large from ami-0dcf85379b0471a5d (root /dev/sda1, 100 GB gp3)
+[2026-11-19T23:52:16Z] security group <redacted>: inbound tcp/22 from <my-ip>/32 only
+[2026-11-19T23:52:18Z] launching t3.large from <redacted> (root /dev/sda1, 100 GB gp3)
 
 aws: [ERROR]: An error occurred (Blocked) when calling the RunInstances operation: This account is currently blocked and not recognized as a valid account. Please contact https://support.console.aws.amazon.com/support/home?region=us-east-1#/case/create?issueType=customer-service&serviceCode=account-management&categoryCode=account-verification if you have questions.
 exit=254
