@@ -70,7 +70,9 @@ The old queries were checked for other places where the answer depends on chance
   - `new-service` also runs on `workflow_run` when `record` completes on `main`, whether the run succeeded or failed. It then checks `main` as the recording run left it.
   - The bot's commit is pushed with `GITHUB_TOKEN` and starts no workflow, which is why the trigger is the record run's completion, not the bot's push.
 - **Nothing is weakened.** Every push that changes inputs still ends in a full new-service run against the new recording. If the re-record fails, the run still happens and is red.
-- **Proof (in progress at hand-off):** `dab23b2` changes a comment in `parity-exclusions.txt`. Its new-service run [44687279424](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44687279424) should skip the checks, and record [44687279180](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44687279180) should then start a `workflow_run` new-service run.
+- **Proof, in two steps.** `dab23b2` changes only a comment in `parity-exclusions.txt`, a recording input.
+  1. Its push-triggered new-service run [44687279424](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44687279424) passed, with `inputs` green and the check jobs skipped.
+  2. Record run [44687279180](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44687279180) passed, and the bot committed `72fa39b`. Its completion started new-service run [44687871606](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44687871606) (event `workflow_run`, on `72fa39b`), which ran every check job and passed: recordings (a) and (b), negative control and data change.
 
 ### Probe branches
 
@@ -85,3 +87,41 @@ A probe branch is a deliberate experiment: a throwaway branch that changes one t
 - Stryker on `1432eda`: 81.25%, against a break threshold of 80 ([44685875127](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44685875127)). Spec 02's code scored 90.82%.
 - Most of the 20 survivors are in `GalleryDb.OnModelCreating`, the table and column mapping. EF Core builds the model once per process and caches it, so a mutant switched on after that changes nothing. A wrong table name would break every query.
 - The other survivors are the same `HostingRules` and startup lines as before. Nothing was excluded from mutation.
+
+## 2026-11-20: session 2
+
+### Decisions settled by spec amendments B1 and B2
+
+- **B1, tie-break.** Registration order is the final fix for bug 2. The code comment in `PackageQueries.cs` and the decision above now say so, and why: the order is deterministic and also matches what the old app's plan happened to return (`842ab51`).
+- **B2, like-for-like benchmark** (`220ca2f`, `396c87d`):
+  - **Transport.** The service is called over HTTPS on `localhost`, like the old app, with a self-signed RSA 2048 certificate made in the run. `benchmark.ps1` reads each app's certificate from its TLS handshake, and fails unless k6 negotiated the same HTTP and TLS versions with both. Both negotiated HTTP/2 over TLS 1.3 in every run.
+  - **Logging.** "Same level" is matched by what each process actually writes, not by a level name. The old app's process writes two console lines per request (IIS Express), and the gallery's Serilog logger has no sink here (no console sink, empty Application Insights key). So the service logs ASP.NET Core's two request lines, one line each, and nothing else below Warning. Measured: 1.96 against 2.00 lines, and 190 against 658 bytes, per request. The byte difference is a caveat in `benchmark.md`.
+- **Benchmark database cost, rebuilt.** The first three runs on `ea4e68b` were green, but their database numbers were wrong. Plan-cache entries were lost under load, so the DMV difference fell short of the requests sent: 36 prefix executions for about 13,800 requests, and negative reads in one case. The cost is now measured in its own pass per app: clear the plan cache, send the 1,000-request mix once at concurrency 1, and read the stats for the NuGetGallery database. Exact execution counts (600, 300, 100) are asserted. They held in every run.
+
+### Dependabot PRs #1 to #8
+
+- `75b9fe9` applies all four bumps at every use, SHA-pinned, taken from the PR diffs: checkout v7.0.1, upload-artifact v7.0.2, download-artifact v8.0.2, and cache/restore and cache/save v6.1.0. That covers every workflow, `benchmark.yml` and both composite actions. No old SHA remains.
+- **Proof that the bot can still push under checkout v7.** Record run [44688687862](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44688687862) (dispatched, commit on) passed. Its commit job pushed `17efe10`, which changes only `recordings/manifest.json`. That record run's completion started new-service [44689314327](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44689314327) (`workflow_run`), which ran every check job and passed. This also exercises v7's `workflow_run` checkout change.
+- Dependabot closed each PR itself once `main` was up to date. Each carries a comment linking the commit.
+
+### Runs this session
+
+| Run | Workflow | Commit | Result |
+|---|---|---|---|
+| [44687871606](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44687871606) | new-service (`workflow_run`, the race-fix proof) | `72fa39b` | pass |
+| [44688625322](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44688625322) | benchmark | `75b9fe9` | **red**: the protocol check compared unsorted strings. Fixed in `396c87d`. |
+| [44688687862](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44688687862) | record, commit on | `75b9fe9` | pass, bot commit `17efe10` |
+| [44689314327](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44689314327) | new-service (`workflow_run`) | `17efe10` | pass |
+| [44689681283](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44689681283) | new-service | `396c87d` | pass |
+| [44689681324](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44689681324) | old-app | `396c87d` | pass |
+| [44689681332](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44689681332) | service-quality | `396c87d` | pass |
+| [44689681333](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44689681333) | lint | `396c87d` | pass |
+| [44689681286](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44689681286) | codeql | `396c87d` | pass |
+| [44689736187](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44689736187) | live-parity | `396c87d` | pass |
+| [44689693749](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44689693749), [44689704828](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44689704828), [44689715248](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44689715248), [44689725788](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44689725788) | benchmark: old app, new service, old app, new service first | `396c87d` | pass; read together in [`benchmark.md`](benchmark.md) |
+
+`396c87d` is the last code change. Later commits change only documentation.
+
+### Benchmark findings
+
+These are in [`benchmark.md`](benchmark.md). In all four runs, the new service served at least 4.1 times the old app's requests per second, with a lower p50 and p95 at every concurrency level and no errors from either app. Its queries read fewer pages per execution: prefix about 3.8 times fewer, versions about 22 times fewer, most-downloaded about 30% fewer. They also used less CPU per execution. p99 latency and scaling with concurrency did not agree across runs, so neither is claimed.
