@@ -41,14 +41,26 @@ function Invoke-FormPost([string]$Url, [hashtable]$Fields, [string]$OutFile, [st
     $pairs += $Arrays
     $bodyFile = Join-Path $secretDir 'body.txt'
     Set-Content -Path $bodyFile -Value ($pairs -join '&') -NoNewline -Encoding ascii
-    $code = & curl.exe -sS -k -b $jar -c $jar -o $OutFile -w '%{http_code}' `
+    $code = & curl.exe -sS -k -b $jar -c $jar -o $OutFile -D $hdrFile -w '%{http_code}' `
         -H 'Content-Type: application/x-www-form-urlencoded' --data-binary "@$bodyFile" "$BaseUrl$Url"
     Remove-Item $bodyFile
+    Show-Headers "POST $Url"
     return [int]$code
 }
 
+$hdrFile = Join-Path $secretDir 'headers.txt'
+# Log status, Location and the names (never values) of cookies set, for debugging the flow.
+function Show-Headers([string]$What) {
+    $h = Get-Content $hdrFile
+    $loc = ($h | Where-Object { $_ -match '^Location:' }) -join ' '
+    $cookies = ($h | Where-Object { $_ -match '^Set-Cookie:\s*([^=]+)=' } | ForEach-Object { ([regex]::Match($_, '^Set-Cookie:\s*([^=]+)=')).Groups[1].Value }) -join ','
+    Write-Host "$What -> $($h[0]) $loc cookies-set=[$cookies]"
+}
+
 function Get-Page([string]$Path, [string]$OutFile) {
-    return [int](& curl.exe -sS -k -b $jar -c $jar -o $OutFile -w '%{http_code}' "$BaseUrl$Path")
+    $code = [int](& curl.exe -sS -k -b $jar -c $jar -o $OutFile -D $hdrFile -w '%{http_code}' "$BaseUrl$Path")
+    Show-Headers "GET $Path"
+    return $code
 }
 
 # ---- 1. register ----------------------------------------------------------------------------
@@ -78,6 +90,12 @@ if ($code -ne 302) {
 }
 
 # ---- 2. API key -----------------------------------------------------------------------------
+# Follow the post-registration redirect like a browser would (the landing page consumes TempData).
+$loc = (Get-Content $hdrFile | Where-Object { $_ -match '^Location:\s*(\S+)' } | ForEach-Object { $Matches[1] } | Select-Object -First 1)
+Write-Host "register redirected to: $loc"
+if ($loc -and $loc -match '/users/account/LogOn') { throw "Registration redirected to sign-in ($loc), so no session was created" }
+$landing = if ($loc -and $loc.StartsWith('/')) { $loc } elseif ($loc) { ([uri]$loc).PathAndQuery } else { '/' }
+[void](Get-Page $landing (Join-Path $secretDir 'landing.html'))
 $page = Join-Path $secretDir 'apikeys.html'
 $code = Get-Page '/account/apikeys' $page
 if ($code -ne 200) { throw "GET /account/apikeys returned $code (not signed in after registration?)" }
