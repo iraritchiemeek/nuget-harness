@@ -59,7 +59,7 @@ if ($Exclusions) {
             'excluded' {
                 if ($request.StartsWith('GET ')) { throw "a GET request cannot be excluded: $request" }
                 $excluded[$r] = $true
-                $report += "EXCLUDED     $r  $request  ($reason)"
+                $report += "EXCLUDED   $r  $request  ($reason)"
             }
             'status-only' {
                 $statusOnly[$r] = $request
@@ -76,7 +76,7 @@ foreach ($r in $records) {
         if ($Changed -and (Get-Status $Changed $r) -ne $expected) { $changedCount++ }
         if ($expected -and $expected -ceq $actual) { continue }
         $differ++
-        $report += "DIFFERENT    $r  $($statusOnly[$r])  (status only)"
+        $report += "DIFFERENT  $r  $($statusOnly[$r])  (status only)"
         $report += "    meta expected  $expected"
         $report += "    meta actual    $actual"
         continue
@@ -86,7 +86,7 @@ foreach ($r in $records) {
     $differ++
     $bm = Read-Meta (Join-Path $Before "$r.meta"); $am = Read-Meta (Join-Path $After "$r.meta")
     $request = if ($bm.Count) { $bm[0] } elseif ($am.Count) { $am[0] } else { $r }
-    $report += "DIFFERENT    $r  $request"
+    $report += "DIFFERENT  $r  $request"
     foreach ($d in Compare-Object $bm $am -CaseSensitive) {
         $side = if ($d.SideIndicator -eq '<=') { 'expected' } else { 'actual  ' }
         $report += "    meta $side  $($d.InputObject)"
@@ -103,7 +103,7 @@ if ($Changed) { $summary += "changed by the mutation: $changedCount" }
 $report | Select-Object -First 60 | Write-Host
 
 $ok = ($differ -eq 0) -and ($compared -gt 0) -and ((-not $Changed) -or ($changedCount -gt 0))
-$detail = "$($compared - $differ)/$compared records identical" + $(if ($excluded.Count) { ", $($excluded.Count) excluded" } else { '' }) + $(if ($statusOnly.Count) { " ($($statusOnly.Count) by status only)" } else { '' }) + $(if ($Changed) { "; the mutation changed $changedCount" } else { '' }) + " ($OutName)"
+$detail = "$($compared - $differ)/$compared records identical" + $(if ($statusOnly.Count) { " ($($statusOnly.Count) by status only)" } else { '' }) + $(if ($excluded.Count) { ", $($excluded.Count) excluded" } else { '' }) + $(if ($Changed) { "; the mutation changed $changedCount" } else { '' }) + " ($OutName)"
 Write-Result $CheckNumber $Name $ok $detail
 Write-Summary "- $Name`: $(if ($ok) {'pass'} else {'FAIL'}) - $detail"
 if (-not $ok) { throw "$Name`: failed" }
