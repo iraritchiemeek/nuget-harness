@@ -1,13 +1,14 @@
 {
-    "run":  "https://github.com/iraritchiemeek/nuget-harness/actions/runs/44678822763",
+    "run":  "https://github.com/iraritchiemeek/nuget-harness/actions/runs/44685874893",
     "appCommit":  "63e6ee4202b441e1c904d6f78fc7b070f36bc24f",
     "snapshotRun":  "https://github.com/iraritchiemeek/nuget-harness/actions/runs/44653627352",
     "snapshotSha256":  "e962712feba9977d7b25f98e9c9c59a4a42834db27da9ddd96a634fc6ae487e0",
     "stateBList":  "0a63523b33d633875480bf614d1b8e95848a2d0c2467afc48e8317eee8c71155",
-    "stateBSnapshotRun":  "https://github.com/iraritchiemeek/nuget-harness/actions/runs/44678822763",
-    "stateBSnapshotSha256":  "cef0af7be1e7580ffe78d204ec8358d32af2bb7c89f8f90341f2df001dc3fb59",
+    "stateBSnapshotRun":  "https://github.com/iraritchiemeek/nuget-harness/actions/runs/44685874893",
+    "stateBSnapshotSha256":  "8199b892b7c34c13990839fb577099bdf1b14bad3b1702bef0b4c6bcd87e8e78",
     "requests":  351,
     "files":  {
+                  "approved-differences.json":  "22891b81c8c7a5e905e4e999f221d68b1d744d8f69d2e5633db8811fe33b2fc4",
                   "ignored-headers.txt":  "1b839dc12cf19cedf357bb7c2dd1fff0de01576ee81a005a78728c8984650b22",
                   "parity-exclusions.txt":  "2b8a1f38734f02f681902cd1b89db8ee2aa36d5bb88903a12a6e3cf7745dc27a",
                   "requests.txt":  "017c1faed93c09bd5c4a677f8c0bf89dd5a290f12fc5ff12d5ed2718a574a1f8",
