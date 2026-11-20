@@ -1,0 +1,71 @@
+name: gallery-build
+description: >
+  Check out NuGetGallery at the pinned commit, park .NET SDKs newer than 9, and restore the
+  compiled gallery from cache, building it with build.ps1 on a miss. The caller checks out this
+  repository first, because a local action can only run once the repository is on disk.
+
+inputs:
+  gallery-sha:
+    description: NuGetGallery commit to check out
+    required: true
+  skip-cache:
+    description: "'true' to ignore the cached build output and run build.ps1 from source"
+    required: false
+    default: 'false'
+
+outputs:
+  cache-hit:
+    description: "'true' when the build output came from the cache and build.ps1 was skipped"
+    value: ${{ steps.restore.outputs.cache-hit }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check out NuGetGallery at the pinned commit
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      with:
+        repository: NuGet/NuGetGallery
+        ref: ${{ inputs.gallery-sha }}
+        path: gallery
+        fetch-depth: 1
+
+    - name: Park .NET SDKs newer than 9 (runner change, not app change)
+      shell: powershell
+      run: .\scripts\runner\pin-dotnet-sdk.ps1
+
+    # The app is pinned and never edited, so its build output only changes with the SHA or the
+    # runner image. The EntityFramework package is included because Setup-DevEnvironment.ps1
+    # runs ef6.exe from the NuGet package folder. The paths and key are defined once, here.
+    - name: Define the build cache
+      id: cache
+      shell: powershell
+      run: |
+        Add-Content $env:GITHUB_OUTPUT "key=gallery-build-v2-${{ inputs.gallery-sha }}-$env:ImageOS-$env:ImageVersion"
+        Add-Content $env:GITHUB_OUTPUT "paths<<EOF`ngallery/src/NuGetGallery`n!gallery/src/NuGetGallery/obj`n~/.nuget/packages/entityframework`nEOF"
+
+    - name: Restore cached gallery build output
+      id: restore
+      if: inputs.skip-cache != 'true'
+      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: ${{ steps.cache.outputs.paths }}
+        key: ${{ steps.cache.outputs.key }}
+
+    - name: Build (gallery build.ps1 -SkipJobs -SkipArtifacts)
+      if: steps.restore.outputs.cache-hit != 'true'
+      shell: powershell
+      run: .\scripts\runner\build.ps1
+
+    - name: Save gallery build output
+      if: steps.restore.outputs.cache-hit != 'true'
+      uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: ${{ steps.cache.outputs.paths }}
+        key: ${{ steps.cache.outputs.key }}
+
+    - name: Record build source
+      shell: powershell
+      run: |
+        if ('${{ steps.restore.outputs.cache-hit }}' -eq 'true') { $m = 'restored from cache (build.ps1 skipped)' } else { $m = 'built with build.ps1' }
+        if (-not (Test-Path gallery\src\NuGetGallery\bin\NuGetGallery.dll)) { throw 'NuGetGallery.dll missing' }
+        Add-Content $env:GITHUB_STEP_SUMMARY "- gallery build output: $m (image $env:ImageOS $env:ImageVersion)"

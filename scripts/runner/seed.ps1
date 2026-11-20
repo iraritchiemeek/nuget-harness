@@ -69,7 +69,7 @@ $email = 'seeduser@example.com'   # placeholder, not a real mailbox; the DB back
 $password = New-Secret 24
 Write-Host "::add-mask::$password"
 # Kept in RUNNER_TEMP (never uploaded) only so secret-scan.ps1 can prove it is not in any artifact.
-Set-Content -Path (Join-Path $env:RUNNER_TEMP 'password.txt') -Value $password -NoNewline
+Set-Content -Path $PasswordFile -Value $password -NoNewline
 
 $page = Join-Path $secretDir 'signup.html'
 $code = Get-Page '/users/account/SignUp' $page
@@ -124,7 +124,7 @@ if (-not $apiKey) { throw 'GenerateApiKey response had no Value' }
 Write-Host "::add-mask::$apiKey"
 Remove-Item $resp
 # Kept for later steps of this job only (mutate.ps1). RUNNER_TEMP is never uploaded.
-Set-Content -Path (Join-Path $env:RUNNER_TEMP 'apikey.txt') -Value $apiKey -NoNewline
+Set-Content -Path $ApiKeyFile -Value $apiKey -NoNewline
 Write-Summary "- seed: user registered through the sign-up form, API key created through the API keys form"
 
 # ---- 3. download ----------------------------------------------------------------------------
@@ -134,13 +134,7 @@ $entries = Get-Content (Join-Path $RepoRoot 'seed\packages.txt') | Where-Object 
 }
 Write-Host "seed list: $($entries.Count) package versions"
 foreach ($e in $entries) {
-    $low = $e.Id.ToLowerInvariant(); $v = $e.Version.ToLowerInvariant()
-    $file = Join-Path $PackageCache "$low.$v.nupkg"
-    $e | Add-Member File $file
-    if (Test-Path $file) { continue }
-    $url = "https://api.nuget.org/v3-flatcontainer/$low/$v/$low.$v.nupkg"
-    $code = & curl.exe -sS -L --retry 3 -o $file -w '%{http_code}' $url
-    if ($code -ne '200') { throw "download $url returned $code" }
+    $e | Add-Member File (Get-SeedPackage -Id $e.Id -Version $e.Version -CacheDir $PackageCache)
 }
 
 # ---- 4. push --------------------------------------------------------------------------------
@@ -162,16 +156,14 @@ $sw = [Diagnostics.Stopwatch]::StartNew()
 foreach ($e in $entries) {
     $ns = Read-Nuspec $e.File
     $t = [Diagnostics.Stopwatch]::StartNew()
-    $code = & curl.exe -sS -k -o (Join-Path $secretDir 'push-response.txt') -w '%{http_code}' -X PUT `
-        -H "X-NuGet-ApiKey: $apiKey" -H 'X-NuGet-Protocol-Version: 4.1.0' `
-        -F "package=@$($e.File);type=application/octet-stream" "$BaseUrl/api/v2/package/"
+    $code = Publish-Package -File $e.File -ApiKey $apiKey -ResponseFile (Join-Path $secretDir 'push-response.txt')
     $t.Stop()
     $results += "$($e.Id)`t$($e.Version)`t$($ns.Id)`t$($ns.Version)`t$code`t$([math]::Round($t.Elapsed.TotalSeconds,2))"
     # Expected values come from the seed list and each nuspec, never from which pushes succeeded.
     $key = ($expected.Keys | Where-Object { $_ -ieq $ns.Id } | Select-Object -First 1)
     if (-not $key) { $key = $ns.Id; $expected[$key] = New-Object System.Collections.ArrayList }
     [void]$expected[$key].Add($ns.Version)
-    if ($code -ne '201') {
+    if ($code -ne 201) {
         $failures++
         $msg = (Get-Content (Join-Path $secretDir 'push-response.txt') -Raw -ErrorAction SilentlyContinue)
         Write-Host "::error::push $($e.Id) $($e.Version) -> $code $msg"

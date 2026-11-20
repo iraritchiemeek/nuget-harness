@@ -6,12 +6,12 @@ param([Parameter(Mandatory)] [string]$Before, [string]$Changed, [Parameter(Manda
 . "$PSScriptRoot\common.ps1"
 $checkDir = Join-Path $OutDir 'checks'
 New-Item -ItemType Directory -Force -Path $checkDir | Out-Null
-function Hash-Dir([string]$d) {
+function Get-DirectoryHash([string]$d) {
     $h = @{}
     Get-ChildItem $d -File | ForEach-Object { $h[$_.Name] = (Get-FileHash $_.FullName -Algorithm SHA256).Hash }
     return $h
 }
-$b = Hash-Dir $Before; $a = Hash-Dir $After; $c = if ($Changed) { Hash-Dir $Changed } else { @{} }
+$b = Get-DirectoryHash $Before; $a = Get-DirectoryHash $After; $c = if ($Changed) { Get-DirectoryHash $Changed } else { @{} }
 $names = @(@($b.Keys) + @($a.Keys) | Sort-Object -Unique)
 $lines = @(); $diffAfter = 0; $diffChanged = 0
 foreach ($n in $names) {

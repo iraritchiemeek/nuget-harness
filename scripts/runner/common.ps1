@@ -8,6 +8,11 @@ $Script:SiteDir    = Join-Path $GalleryDir 'src\NuGetGallery'
 $Script:OutDir     = Join-Path $RepoRoot 'out'
 $Script:SiteName   = 'NuGet Gallery (localhost)'
 $Script:BaseUrl    = 'https://localhost'
+$Script:Databases  = 'NuGetGallery', 'SupportRequest'
+# Secrets made by seed.ps1. RUNNER_TEMP is never uploaded; secret-scan.ps1 reads these files to
+# prove neither secret reached an artifact.
+$Script:ApiKeyFile   = Join-Path $env:RUNNER_TEMP 'apikey.txt'
+$Script:PasswordFile = Join-Path $env:RUNNER_TEMP 'password.txt'
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
 function Get-IISExpressDir {
@@ -53,6 +58,42 @@ function Invoke-Sql {
         $reader.Close()
         return ,$rows
     } finally { $conn.Close() }
+}
+
+# The prefixes for the package-ids check, from seed\prefixes.txt (comments and blanks skipped).
+function Get-Prefixes {
+    return @(Get-Content (Join-Path $RepoRoot 'seed\prefixes.txt') |
+        Where-Object { $_ -and -not $_.StartsWith('#') } | ForEach-Object { $_.Trim() })
+}
+
+# Download one package from nuget.org's flat container into -CacheDir unless it is already there.
+# Returns the .nupkg path.
+function Get-SeedPackage {
+    param([string]$Id, [string]$Version, [string]$CacheDir)
+    $low = $Id.ToLowerInvariant(); $v = $Version.ToLowerInvariant()
+    $file = Join-Path $CacheDir "$low.$v.nupkg"
+    if (Test-Path $file) { return $file }
+    $url = "https://api.nuget.org/v3-flatcontainer/$low/$v/$low.$v.nupkg"
+    $code = & curl.exe -sS -L --retry 3 -o $file -w '%{http_code}' $url
+    if ($code -ne '200') { throw "download $url returned $code" }
+    return $file
+}
+
+# Push one .nupkg through the gallery's V2 push endpoint. Returns the HTTP status.
+function Publish-Package {
+    param([string]$File, [string]$ApiKey, [string]$ResponseFile = 'NUL')
+    $code = & curl.exe -sS -k -o $ResponseFile -w '%{http_code}' -X PUT `
+        -H "X-NuGet-ApiKey: $ApiKey" -H 'X-NuGet-Protocol-Version: 4.1.0' `
+        -F "package=@$File;type=application/octet-stream" "$BaseUrl/api/v2/package/"
+    return [int]$code
+}
+
+# Mirror one folder onto another with robocopy.
+function Copy-Mirror {
+    param([string]$From, [string]$To)
+    & robocopy $From $To /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
+    if ($LASTEXITCODE -ge 8) { throw "robocopy failed with $LASTEXITCODE" }
+    $global:LASTEXITCODE = 0   # robocopy uses 1-7 for success; do not let it become the step exit code
 }
 
 # Record one done-when result; summary.ps1 renders them as a table at the end of the run.

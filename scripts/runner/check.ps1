@@ -6,12 +6,12 @@ $checkDir = Join-Path $OutDir 'checks'
 New-Item -ItemType Directory -Force -Path $checkDir | Out-Null
 $expected = Get-Content (Join-Path $OutDir 'seed\expected.json') -Raw | ConvertFrom-Json
 $ids = @($expected.PSObject.Properties.Name)
-$prefixes = Get-Content (Join-Path $RepoRoot 'seed\prefixes.txt') | Where-Object { $_ -and -not $_.StartsWith('#') } | ForEach-Object { $_.Trim() }
+$prefixes = Get-Prefixes
 $statusOf = @{}
 Get-Content (Join-Path $Dir '_status.tsv') | ForEach-Object { $c = $_ -split "`t"; $statusOf["$($c[0])|$($c[1])"] = [int]$c[2] }
 
 function Read-JsonArray([string]$Path) { return @((Get-Content $Path -Raw | ConvertFrom-Json) | Where-Object { $_ -ne $null }) }
-function Same-Set($a, $b) {
+function Test-SameSet($a, $b) {
     $x = @($a | Sort-Object { $_.ToLowerInvariant() }) -join "`n"; $y = @($b | Sort-Object { $_.ToLowerInvariant() }) -join "`n"
     return ($x -ceq $y) -and (@($a).Count -eq @($b).Count)
 }
@@ -23,7 +23,7 @@ foreach ($p in $prefixes) {
     $want = @($ids | Where-Object { $_.StartsWith($p, [StringComparison]::OrdinalIgnoreCase) })
     $got = @(Read-JsonArray (Join-Path $Dir "ids_$p.json"))
     $st = $statusOf["ids|$p"]
-    $ok = ($st -eq 200) -and ($want.Count -ge 1) -and ($want.Count -lt 30) -and ($got.Count -gt 0) -and (Same-Set $got $want)
+    $ok = ($st -eq 200) -and ($want.Count -ge 1) -and ($want.Count -lt 30) -and ($got.Count -gt 0) -and (Test-SameSet $got $want)
     if (-not $ok) { $fail1++ }
     $lines += "$(if ($ok) {'PASS'} else {'FAIL'})  partialId=$p  status=$st  expected=$($want.Count)  got=$($got.Count)"
     if (-not $ok) { $lines += "      expected: $($want -join ', ')"; $lines += "      got:      $($got -join ', ')" }
@@ -38,7 +38,7 @@ foreach ($id in $ids) {
     $want = @($expected.$id)
     $got = @(Read-JsonArray (Join-Path $Dir "versions_$id.json"))
     $st = $statusOf["versions|$id"]
-    $ok = ($st -eq 200) -and ($got.Count -gt 0) -and (Same-Set $got $want)
+    $ok = ($st -eq 200) -and ($got.Count -gt 0) -and (Test-SameSet $got $want)
     if (-not $ok) { $fail2++ }
     $lines += "$(if ($ok) {'PASS'} else {'FAIL'})  $id  status=$st  expected=[$($want -join ', ')]  got=[$($got -join ', ')]"
 }

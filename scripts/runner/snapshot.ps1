@@ -4,16 +4,14 @@ param([Parameter(Mandatory)] [string]$Dir)
 . "$PSScriptRoot\common.ps1"
 New-Item -ItemType Directory -Force -Path $Dir | Out-Null
 $Dir = (Resolve-Path $Dir).Path
-foreach ($db in 'NuGetGallery', 'SupportRequest') {
+foreach ($db in $Databases) {
     $bak = Join-Path $Dir "$db.bak"
     if (Test-Path $bak) { Remove-Item $bak }
     Invoke-Sql "BACKUP DATABASE [$db] TO DISK = N'$bak' WITH INIT, COPY_ONLY, CHECKSUM" | Out-Null
     Write-Host "backed up $db -> $bak ($((Get-Item $bak).Length) bytes)"
 }
 $files = Join-Path $SiteDir 'App_Data\Files'
-& robocopy $files (Join-Path $Dir 'Files') /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
-if ($LASTEXITCODE -ge 8) { throw "robocopy failed with $LASTEXITCODE" }
-$global:LASTEXITCODE = 0   # robocopy uses 1-7 for success; do not let it become the step exit code
+Copy-Mirror -From $files -To (Join-Path $Dir 'Files')
 Copy-Item (Join-Path $OutDir 'seed\expected.json') (Join-Path $Dir 'expected.json')
 $n = (Get-ChildItem (Join-Path $Dir 'Files') -Recurse -File).Count
 Write-Summary "- snapshot: databases backed up, package store copied ($n files)"

@@ -18,9 +18,10 @@ $ssl = (& netsh http show sslcert hostnameport=localhost:443 | Out-String)
 Write-Host $ssl
 if ($ssl -notmatch 'Certificate Hash') { throw 'No SSL binding for localhost:443' }
 
-$dbs = ((Invoke-Sql "SELECT name FROM sys.databases WHERE name IN ('NuGetGallery','SupportRequest') ORDER BY name") | ForEach-Object { $_.name }) -join ','
-Write-Host "databases: $dbs"
-if ($dbs -notmatch 'NuGetGallery' -or $dbs -notmatch 'SupportRequest') { throw "Expected databases missing. Got: $dbs" }
+$found = @((Invoke-Sql 'SELECT name FROM sys.databases') | ForEach-Object { $_.name })
+$missing = @($Databases | Where-Object { $found -notcontains $_ })
+Write-Host "databases: $($found -join ',')"
+if ($missing.Count) { throw "Expected databases missing: $($missing -join ',')" }
 
 $mig = (Invoke-Sql 'SELECT COUNT(*) AS n FROM __MigrationHistory' -Database NuGetGallery)[0].n
-Write-Summary "- setup: ok (site registered, SSL bound, databases NuGetGallery + SupportRequest, $mig gallery migrations applied)"
+Write-Summary "- setup: ok (site registered, SSL bound, databases $($Databases -join ' + '), $mig gallery migrations applied)"

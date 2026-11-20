@@ -4,9 +4,8 @@
 param([Parameter(Mandatory)] [string]$Dir)
 . "$PSScriptRoot\common.ps1"
 $secrets = @{}
-foreach ($name in 'apikey', 'password') {
-    $f = Join-Path $env:RUNNER_TEMP "$name.txt"
-    if (Test-Path $f) { $secrets[$name] = (Get-Content $f -Raw).Trim() }
+foreach ($s in @{ Name = 'apikey'; File = $ApiKeyFile }, @{ Name = 'password'; File = $PasswordFile }) {
+    if (Test-Path $s.File) { $secrets[$s.Name] = (Get-Content $s.File -Raw).Trim() }
 }
 if ($secrets.Count -eq 0) { Write-Host 'no secrets were created in this job; nothing to scan'; return }
 

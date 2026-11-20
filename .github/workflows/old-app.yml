@@ -13,7 +13,7 @@ on:
         default: false
   push:
     branches: [main]
-    paths-ignore: ['**.md', 'specs/**']
+    paths-ignore: ['**.md', 'specs/**', 'service/**', 'scripts/linux/**', '.github/workflows/new-service.yml']
 
 env:
   GALLERY_SHA: 63e6ee4202b441e1c904d6f78fc7b070f36bc24f
@@ -26,63 +26,20 @@ jobs:
       run:
         shell: powershell
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: Check out NuGetGallery at the pinned commit
-        uses: actions/checkout@v4
+      - name: Build the gallery, or restore it from cache
+        uses: ./.github/actions/gallery-build
         with:
-          repository: NuGet/NuGetGallery
-          ref: ${{ env.GALLERY_SHA }}
-          path: gallery
-          fetch-depth: 1
-
-      - name: Park .NET SDKs newer than 9 (runner change, not app change)
-        run: .\scripts\runner\pin-dotnet-sdk.ps1
+          gallery-sha: ${{ env.GALLERY_SHA }}
+          skip-cache: ${{ inputs.skip_build_cache }}
 
       - name: Restore cached seed packages (downloaded from nuget.org)
         id: seedcache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ${{ runner.temp }}\seed-packages
           key: seed-${{ hashFiles('seed/packages.txt') }}
-
-      # The app is pinned and never edited, so its build output only changes with the SHA or the
-      # runner image. On a hit, build.ps1 is skipped entirely. The EntityFramework package is
-      # included because Setup-DevEnvironment.ps1 runs ef6.exe from the NuGet package folder.
-      - name: Read runner image version
-        id: image
-        run: Add-Content $env:GITHUB_OUTPUT "key=$env:ImageOS-$env:ImageVersion"
-
-      - name: Restore cached gallery build output
-        id: buildcache
-        if: ${{ !inputs.skip_build_cache }}
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            gallery/src/NuGetGallery
-            !gallery/src/NuGetGallery/obj
-            ~/.nuget/packages/entityframework
-          key: gallery-build-v2-${{ env.GALLERY_SHA }}-${{ steps.image.outputs.key }}
-
-      - name: Build (gallery build.ps1 -SkipJobs -SkipArtifacts)
-        if: steps.buildcache.outputs.cache-hit != 'true'
-        run: .\scripts\runner\build.ps1
-
-      - name: Save gallery build output
-        if: steps.buildcache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            gallery/src/NuGetGallery
-            !gallery/src/NuGetGallery/obj
-            ~/.nuget/packages/entityframework
-          key: gallery-build-v2-${{ env.GALLERY_SHA }}-${{ steps.image.outputs.key }}
-
-      - name: Record build source
-        run: |
-          if ('${{ steps.buildcache.outputs.cache-hit }}' -eq 'true') { $m = 'restored from cache (build.ps1 skipped)' } else { $m = 'built with build.ps1' }
-          if (-not (Test-Path gallery\src\NuGetGallery\bin\NuGetGallery.dll)) { throw 'NuGetGallery.dll missing' }
-          Add-Content $env:GITHUB_STEP_SUMMARY "- gallery build output: $m (image $env:ImageOS $env:ImageVersion)"
 
       - name: Setup (gallery tools\Setup-DevEnvironment.ps1)
         run: .\scripts\runner\setup.ps1
@@ -96,15 +53,13 @@ jobs:
 
       - name: Save seed packages
         if: steps.seedcache.outputs.cache-hit != 'true' && steps.seed.outcome == 'success'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ${{ runner.temp }}\seed-packages
           key: ${{ steps.seedcache.outputs.cache-primary-key }}
 
       - name: Checks 1-3 (package-ids, package-versions, live)
-        run: |
-          .\scripts\runner\capture.ps1 -Dir out\responses\seeded
-          .\scripts\runner\check.ps1 -Dir out\responses\seeded
+        run: .\scripts\runner\run-checks.ps1 -Dir out\responses\seeded
 
       - name: Snapshot (database backups + package store)
         run: .\scripts\runner\snapshot.ps1 -Dir out\snapshot
@@ -113,7 +68,7 @@ jobs:
         run: .\scripts\runner\secret-scan.ps1 -Dir out\snapshot
 
       - name: Upload snapshot
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: seed-snapshot
           path: out/snapshot/
@@ -149,7 +104,7 @@ jobs:
 
       - name: Upload check outputs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: check-outputs
           path: |
@@ -167,48 +122,25 @@ jobs:
       run:
         shell: powershell
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: Check out NuGetGallery at the pinned commit
-        uses: actions/checkout@v4
+      - name: Build the gallery, or restore it from cache
+        uses: ./.github/actions/gallery-build
         with:
-          repository: NuGet/NuGetGallery
-          ref: ${{ env.GALLERY_SHA }}
-          path: gallery
-          fetch-depth: 1
-
-      - name: Park .NET SDKs newer than 9 (runner change, not app change)
-        run: .\scripts\runner\pin-dotnet-sdk.ps1
-
-      - name: Read runner image version
-        id: image
-        run: Add-Content $env:GITHUB_OUTPUT "key=$env:ImageOS-$env:ImageVersion"
-
-      - name: Restore cached gallery build output
-        id: buildcache
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            gallery/src/NuGetGallery
-            !gallery/src/NuGetGallery/obj
-            ~/.nuget/packages/entityframework
-          key: gallery-build-v2-${{ env.GALLERY_SHA }}-${{ steps.image.outputs.key }}
-
-      - name: Build (only on a cache miss)
-        if: steps.buildcache.outputs.cache-hit != 'true'
-        run: .\scripts\runner\build.ps1
+          gallery-sha: ${{ env.GALLERY_SHA }}
+          skip-cache: ${{ inputs.skip_build_cache }}
 
       - name: Setup (gallery tools\Setup-DevEnvironment.ps1)
         run: .\scripts\runner\setup.ps1
 
       - name: Download the seed snapshot from the first job
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: seed-snapshot
           path: snapshot
 
       - name: Download the first job's responses
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: check-outputs
           path: first-job
@@ -230,7 +162,7 @@ jobs:
 
       - name: Upload outputs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: fresh-machine-restore-outputs
           path: out/

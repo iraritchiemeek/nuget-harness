@@ -6,7 +6,7 @@ $Dir = (Resolve-Path $Dir).Path
 & "$PSScriptRoot\stop-site.ps1"
 & sqllocaldb start MSSQLLocalDB | Out-Null
 $dataPath = (Invoke-Sql "SELECT CAST(SERVERPROPERTY('InstanceDefaultDataPath') AS nvarchar(400)) AS p")[0].p
-foreach ($db in 'NuGetGallery', 'SupportRequest') {
+foreach ($db in $Databases) {
     $bak = Join-Path $Dir "$db.bak"
     $moves = (Invoke-Sql "RESTORE FILELISTONLY FROM DISK = N'$bak'") | ForEach-Object {
         $ext = if ($_.Type -eq 'L') { '_log.ldf' } else { '.mdf' }
@@ -19,9 +19,7 @@ foreach ($db in 'NuGetGallery', 'SupportRequest') {
     Write-Host "restored $db"
 }
 $files = Join-Path $SiteDir 'App_Data\Files'
-& robocopy (Join-Path $Dir 'Files') $files /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
-if ($LASTEXITCODE -ge 8) { throw "robocopy failed with $LASTEXITCODE" }
-$global:LASTEXITCODE = 0   # robocopy uses 1-7 for success; do not let it become the step exit code
+Copy-Mirror -From (Join-Path $Dir 'Files') -To $files
 New-Item -ItemType Directory -Force -Path (Join-Path $OutDir 'seed') | Out-Null
 Copy-Item (Join-Path $Dir 'expected.json') (Join-Path $OutDir 'seed\expected.json') -Force
 Write-Summary "- reset: databases restored and package store replaced from $Dir"
