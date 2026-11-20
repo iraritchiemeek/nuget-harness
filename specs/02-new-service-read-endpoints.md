@@ -48,7 +48,7 @@ The Mac is only for development. It proves nothing to a reader, so every "Done w
    - a prefix that matches more than 30 IDs, so the cap is exercised
    - an unknown package ID
    - IDs and prefixes with dots, dashes, underscores, URL-encoded characters and trailing slashes
-   - a request with an unsupported HTTP method
+   - a request with an unsupported HTTP method (recorded, but see amendment A1)
 
    The request set comes from reading the old app's controller and routing code, with each group's source noted in a comment. Whatever the old app returns, including errors, is the expected answer.
 3. **The new service passes against the recordings on Linux.** On `ubuntu-24.04`, the workflow:
@@ -96,6 +96,31 @@ The Mac is only for development. It proves nothing to a reader, so every "Done w
 - **Third-party actions** are pinned by commit SHA. The SQL Server image is pinned by digest.
 - **Public repo.** Never commit personal details: no IPs, emails or account IDs.
 - **Agent authorship is visible.** Commits carry the agent's co-author trailer, and the run log records which agent session did what.
+
+## Amendments
+
+Changes made after work started, each with its reason. The original wording above is kept so the change is visible.
+
+**A1. Non-GET requests stay with the old app.**
+- **What changed:** POST, PUT and DELETE to the two routes are still recorded, but they are excluded from the new service's parity checks (3 and 6).
+- **Why:** the old app answers them with ASP.NET's developer-detail 404 page, because the recorder is a local client. That page embeds the framework build number and a stack trace. The new service would have to paste in framework bytes to match it.
+- **Where these requests are checked instead:**
+  - The new service answers them with `405` and `Allow: GET`. A test pins that behaviour.
+  - In a strangler, routing is by method and path. The next spec's proxy sends only `GET` on these routes to the new service, and everything else to the old app. That spec's parity check covers these recorded requests end to end through the proxy.
+- **This doesn't weaken the parity checks.** Each excluded record is listed by name in a committed exclusions file with this reason, and any other mismatch still fails.
+
+**A2. A second data state covers prerelease and SemVer 2.0.0.**
+- **The problem:** the spec 01 seed has no prerelease or SemVer 2.0.0 versions, so the `includePrerelease` and `semVerLevel` requests can't change any response. Spec 01's seed and evidence stay as they are.
+- **What the recording workflow does now:**
+  1. Records state A, the seed snapshot.
+  2. Pushes a fixed list of real prerelease and SemVer 2.0.0 versions of already-seeded IDs through the old app's API. The list is in `seed/state-b.txt`. It includes at least one version with build metadata (`+`) and one with a dotted prerelease label.
+  3. Snapshots the result as `state-b-snapshot`.
+  4. Records the full request set again, as state B.
+- **How the checks change:** checks 3 and 7 run against both states. Check 6 (live parity) also runs after the state-B pushes.
+
+**A3. Undecided behaviour must be recorded.**
+- **The problem:** a response the service chooses on its own isn't parity.
+- **What to do:** add requests for blank or whitespace IDs, `+` in versions, and characters with special meaning in SQL `LIKE` (`%`, `_`, `[`, `~`) in prefixes. The service must then match whatever the old app does.
 
 ## Out of scope for this spec
 
