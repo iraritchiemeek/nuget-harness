@@ -1,0 +1,41 @@
+name: new-service
+
+# Spec 02: the new read service, checked against the old app's recordings on Linux.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'specs/**']
+
+permissions:
+  contents: read
+  actions: read # download seed-snapshot from the old-app run that made it
+
+env:
+  # The old-app run whose seed-snapshot artifact every spec 02 job restores.
+  SNAPSHOT_RUN_ID: '44653627352'
+
+jobs:
+  restore-spike:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Download seed-snapshot
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: seed-snapshot
+          path: snapshot
+          run-id: ${{ env.SNAPSHOT_RUN_ID }}
+          github-token: ${{ github.token }}
+
+      - name: Generate the SA password
+        run: |
+          pw="Sa1-$(openssl rand -hex 16)"
+          echo "::add-mask::$pw"
+          echo "SA_PASSWORD=$pw" >> "$GITHUB_ENV"
+
+      - name: Start SQL Server and restore the snapshot
+        run: scripts/linux/sql-server.sh snapshot
