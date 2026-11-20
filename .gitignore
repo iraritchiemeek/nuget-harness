@@ -1,0 +1,6 @@
+.state/
+.DS_Store
+*.bak
+*.pfx
+*.key
+secrets/
