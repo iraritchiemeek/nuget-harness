@@ -97,8 +97,10 @@ if ($loc -and $loc -match '/users/account/LogOn') { throw "Registration redirect
 $landing = if ($loc -and $loc.StartsWith('/')) { $loc } elseif ($loc) { ([uri]$loc).PathAndQuery } else { '/' }
 [void](Get-Page $landing (Join-Path $secretDir 'landing.html'))
 $page = Join-Path $secretDir 'apikeys.html'
-$code = Get-Page '/account/apikeys' $page
-if ($code -ne 200) { throw "GET /account/apikeys returned $code (not signed in after registration?)" }
+# /account/apikeys redirects everyone to Trusted Publishing unless forceApiKeys=true, which is
+# what the "API keys" link on the Trusted Publishing page sends.
+$code = Get-Page '/account/apikeys?forceApiKeys=true' $page
+if ($code -ne 200) { throw "GET /account/apikeys?forceApiKeys=true returned $code" }
 $html = Get-Content $page -Raw
 $form = Get-FormToken $html '__RequestVerificationToken'
 $gen = [regex]::Match($html, '"GenerateUrl"\s*:\s*"([^"]+)"')
