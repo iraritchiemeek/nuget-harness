@@ -1,0 +1,1 @@
+["Polly","Polly.Caching.Memory","Polly.Contrib.WaitAndRetry","Polly.Core","Polly.Extensions","Polly.Extensions.Http","Polly.RateLimiting"]
