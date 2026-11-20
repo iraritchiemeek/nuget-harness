@@ -181,7 +181,7 @@ Work by a Claude Code agent session (session 5), after the human added amendment
 
 ### A4 applied
 
-- **The service** answers a whitespace-only id with an empty `404`, the status IIS gives the old app's requests (both recorded records: `status: 404`, in both states). Before, it answered `500`, the old controller's answer to a blank id, which IIS never lets through. Pinned by `A_blank_id_is_not_found_with_an_empty_body` (status, no content type, empty body, gallery headers) for `%20` and `%20%20`.
+- **The service** answers a whitespace-only id with an empty `404`, the status IIS gives the old app's requests (both recorded records: `status: 404`, in both states). Before, it answered `500`, the old controller's answer to a blank id, which IIS never lets through. Pinned by `A_blank_id_is_not_found_with_an_empty_body` (status, no content type, empty body, `Cache-Control` and `X-Frame-Options`) for `%20` and `%20%20`.
 - **The exclusions file** now gives each entry a mode: `excluded` (the three A1 entries, unchanged in meaning) or `status-only` (the two A4 entries). `compare.ps1` compares only the `status:` lines of a `status-only` record, counts it as compared, and fails if either side's record or status line is missing. It still refuses a GET in mode `excluded`, an unknown mode and a stale entry. Tried locally against copies of `recordings/state-a`: a changed body on a listed record passes; a changed status, a deleted record, and a changed body on an unlisted record each fail; each malformed entry throws.
 - **Re-record.** Pushing the exclusions file ran the recording workflow ([44670190089](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44670190089)). Its commit changed only `recordings/manifest.json`: the run links, the state-B snapshot digest and the exclusions file hash. Every recorded byte is unchanged.
 
@@ -190,6 +190,7 @@ Work by a Claude Code agent session (session 5), after the human added amendment
 | Run | Workflow | Result | What happened | Change that followed |
 |---|---|---|---|---|
 | [44670190089](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44670190089) | record | **pass** | The current recording. Checks 1 and 2. | |
+| [44670190025](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44670190025), [44670190018](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44670190018), [44670190071](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44670190071), [44670190009](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44670190009) | service-quality, codeql, lint, old-app | pass | The same push, on the A4 code. | |
 | [44670190106](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44670190106) | new-service | fail, expected | Ran on the push that changed the exclusions file, before the re-record: the manifest's hash of the file was stale. | None needed |
 | [44670831746](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44670831746) | new-service | fail (check 5 only) | Checks 3, 4 and 7 pass. Check 5 failed because `negative-control.ps1` reads the report's `DIFFERENT` lines, and `compare.ps1` had widened their spacing. | Restored the report's line format |
 | [44670834825](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44670834825) | live-parity | pass | State A 292/292, state B 292/292, extra 327/327, on the commit before the format fix. | |
@@ -201,10 +202,12 @@ Work by a Claude Code agent session (session 5), after the human added amendment
 | [44668156090](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44668156090) | old-app (session 4) | pass on rerun | Attempt 1 failed in `restore-on-fresh-machine` (LocalDB "SQL Server process failed to start"); attempt 2 passed. | |
 | [44671063570](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44671063570) | old-app | **pass** on attempt 2 | Job `old-app` (old app checks, empty source diff) passed. Job `restore-on-fresh-machine` failed on attempt 1 at LocalDB startup, as in 44668156090, and passed when rerun. | |
 
-**The LocalDB start flake.** Across the old-app workflow's history, the `restore-on-fresh-machine` job has run 22 times, counting reruns. It failed twice, both times the same way: LocalDB "SQL Server process failed to start" inside the gallery's own `Setup-DevEnvironment.ps1` (44668156090 attempt 1, 44671063570 attempt 1). Both passed when rerun, and every other attempt started LocalDB. The failing script is the old app's, so it is not changed. No automatic retry was added: it would also hide a real setup fault. If the rate grows, a harness step that starts LocalDB before the gallery's setup is the place to look.
+**The LocalDB start flake.** Across the old-app workflow's history, the `restore-on-fresh-machine` job has run 22 times, counting reruns. It failed twice, both times the same way: LocalDB "SQL Server process failed to start" inside the gallery's own `Setup-DevEnvironment.ps1`. Both failures are among the seven most recent attempts (44668156090 attempt 1, and 44671063570 attempt 1, the run on the final code); the fifteen before them were clean. Both passed when rerun. The failing script is the old app's, so it is not changed. No automatic retry was added: it would also hide a real setup fault. If it keeps recurring, a harness step that starts LocalDB before the gallery's setup is the place to look.
 
 ### Decisions
 
 - **Status-only compares the status line only,** as A4 and the mode's name say. Comparing the other headers would be stricter, and they match today, but IIS's error-page headers are as much a host artefact as its body.
 - **404 for every whitespace-only id.** The service uses `string.IsNullOrWhiteSpace`, so ids of tabs or other whitespace also get `404`. Only spaces are recorded; what IIS does with, say, `%09` is not known.
 - **Report format kept.** `negative-control.ps1` matches `DIFFERENT  <record>  <request>` exactly, so new lines follow the old two-space layout.
+
+Session 5 total: 17 workflow runs (18 attempts with the rerun), listed above.

@@ -28,10 +28,10 @@ Status on 2026-11-20 (UTC), session 5. Every number links to the public run that
 | `POST /api/v2/package-ids?partialId=Serilog` | excluded | A1: not a GET. The old app answers with ASP.NET's developer-detail 404 page (framework build, stack trace). The next spec's proxy sends it to the old app. The service answers `405` with `Allow: GET`, pinned by `Methods_other_than_GET_are_refused_with_405_and_Allow_GET`. |
 | `DELETE /api/v2/package-versions/Serilog` | excluded | A1, as above |
 | `PUT /api/v2/package-versions/Serilog` | excluded | A1, as above |
-| `GET /api/v2/package-versions/%20` | status-only | A4: the old app's code never sees it. IIS trims the trailing spaces, finds no route and answers `404` with its "404.4" detailed error page, which names the recording machine's paths. Both answer `404`. The service's body (empty, no content type, the gallery headers) is pinned by `A_blank_id_is_not_found_with_an_empty_body`. |
+| `GET /api/v2/package-versions/%20` | status-only | A4: the old app's code never sees it. IIS trims the trailing spaces, finds no route and answers `404` with its "404.4" detailed error page, which names the recording machine's paths. Both answer `404`. The service's answer (empty body, no content type, `Cache-Control: private`, `X-Frame-Options: deny`) is pinned by `A_blank_id_is_not_found_with_an_empty_body`. |
 | `GET /api/v2/package-versions/%20%20` | status-only | A4, as above |
 
-In mode `status-only` only the `status:` lines are compared. The headers and body are not. A missing record or a missing status line fails. The other recorded headers of these two records happen to match too: the only meta difference in the last run before A4 was the status and the content type ([44669108406](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44669108406)).
+In mode `status-only` only the `status:` lines are compared. The headers and body are not. A missing record or a missing status line fails. In the last run before A4, when the service still answered `500`, the only header differences on these two records were the status and the content type ([44669108406](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44669108406)).
 
 ## Where the counts come from
 
