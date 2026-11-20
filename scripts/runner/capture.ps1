@@ -39,6 +39,7 @@ foreach ($line in $lines) {
     $extra = @('--path-as-is', '-g', '-X', $method, '-D', $headerFile)
     if ($method -in 'POST', 'PUT') { $extra += @('-H', 'Content-Length: 0') }
     $r = Invoke-Curl -Path "$Server$path" -OutFile $body -Extra $extra
+    if ($r.Status -eq 0) { throw "no HTTP response for $line from $Server" }
     if (-not (Test-Path $body)) { New-Item -ItemType File -Path $body | Out-Null }   # curl writes no file for an empty body
 
     # With interim responses (100 Continue) curl writes several header blocks; keep the last one.

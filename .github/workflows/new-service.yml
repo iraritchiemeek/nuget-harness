@@ -15,27 +15,75 @@ permissions:
 env:
   # The old-app run whose seed-snapshot artifact every spec 02 job restores.
   SNAPSHOT_RUN_ID: '44653627352'
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
 
 jobs:
-  restore-spike:
+  # Done-when 3: restore the snapshot into SQL Server, start the service, send every recorded
+  # request, and require every record to match.
+  recordings:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0 # verify-recordings.ps1 reads who last committed recordings/
 
       - name: Download seed-snapshot
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: seed-snapshot
-          path: snapshot
+          path: ${{ runner.temp }}/snapshot
           run-id: ${{ env.SNAPSHOT_RUN_ID }}
           github-token: ${{ github.token }}
 
-      - name: Generate the SA password
+      - name: Verify the recordings against their manifest
+        shell: pwsh
+        run: ./scripts/runner/verify-recordings.ps1 -Snapshot "$env:RUNNER_TEMP/snapshot"
+
+      - name: Generate the SQL passwords
         run: |
-          pw="Sa1-$(openssl rand -hex 16)"
-          echo "::add-mask::$pw"
-          echo "SA_PASSWORD=$pw" >> "$GITHUB_ENV"
+          for name in SA_PASSWORD READER_PASSWORD; do
+            pw="Pw1-$(openssl rand -hex 16)"
+            echo "::add-mask::$pw"
+            echo "$name=$pw" >> "$GITHUB_ENV"
+          done
 
       - name: Start SQL Server and restore the snapshot
-        run: scripts/linux/sql-server.sh snapshot
+        run: scripts/linux/sql-server.sh "$RUNNER_TEMP/snapshot"
+
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          global-json-file: service/global.json
+
+      - name: Build the service
+        run: dotnet publish service/src/GalleryReadService -c Release -o "$RUNNER_TEMP/publish"
+
+      - name: Start the service as the read-only login
+        run: |
+          export Database__ConnectionString="Server=localhost,1433;Database=NuGetGallery;User Id=reader;Password=$READER_PASSWORD;TrustServerCertificate=True"
+          export ASPNETCORE_URLS=http://localhost:5080
+          nohup dotnet "$RUNNER_TEMP/publish/GalleryReadService.dll" > "$RUNNER_TEMP/service.log" 2>&1 &
+          for _ in $(seq 1 30); do
+            if curl -sf http://localhost:5080/health > /dev/null; then echo 'service healthy'; exit 0; fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/service.log"; exit 1
+
+      - name: Check 3 (every recorded request matches)
+        shell: pwsh
+        run: |
+          ./scripts/runner/capture.ps1 -Requests recordings/requests.txt -Dir out/new-service -Server http://localhost:5080
+          ./scripts/runner/compare.ps1 -Before recordings/responses -After out/new-service -CheckNumber 3 -Name 'new service matches the recordings' -OutName check3-recordings.txt
+
+      - name: Service log
+        if: always()
+        run: cp "$RUNNER_TEMP/service.log" out/ 2>/dev/null || true
+
+      - name: Upload outputs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: new-service-recordings
+          path: out/
+          if-no-files-found: warn

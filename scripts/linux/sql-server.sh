@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Start SQL Server in Docker and restore the NuGetGallery database from a seed-snapshot folder.
 # Usage: sql-server.sh <snapshot-dir>
-# Needs SA_PASSWORD in the environment (generated and masked by the workflow, never committed).
+# Needs SA_PASSWORD and READER_PASSWORD in the environment (generated and masked by the workflow,
+# never committed). Creates the login `reader`, a member of db_datareader only, for the new service.
 # Prints the server version, the restored database's compatibility level and collation, and a
 # row count, so each run log shows what the backup was restored into.
 set -euo pipefail
@@ -12,6 +13,7 @@ SQL_IMAGE='mcr.microsoft.com/mssql/server@sha256:4525e3efac9f3e241cb003bb2ff2a82
 CONTAINER=nuget-sql
 snapshot_dir=$(cd "$1" && pwd)
 : "${SA_PASSWORD:?SA_PASSWORD must be set}"
+: "${READER_PASSWORD:?READER_PASSWORD must be set}"
 
 docker run -d --name "$CONTAINER" -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD="$SA_PASSWORD" \
   -p 1433:1433 -v "$snapshot_dir:/snapshot:ro" "$SQL_IMAGE" >/dev/null
@@ -33,3 +35,14 @@ sql -Q "RESTORE DATABASE [NuGetGallery] FROM DISK = N'/snapshot/NuGetGallery.bak
 sql -Q "SET NOCOUNT ON;
   SELECT name, compatibility_level, collation_name FROM sys.databases WHERE name = N'NuGetGallery';
   SELECT COUNT(*) AS packages FROM NuGetGallery.dbo.Packages;"
+
+# The service's login can read and nothing else (spec 02, done-when 7).
+sql -Q "SET NOCOUNT ON;
+  CREATE LOGIN [reader] WITH PASSWORD = N'$READER_PASSWORD', CHECK_POLICY = OFF;
+  USE [NuGetGallery];
+  CREATE USER [reader] FOR LOGIN [reader];
+  ALTER ROLE [db_datareader] ADD MEMBER [reader];
+  SELECT r.name AS role_of_reader FROM sys.database_role_members m
+    JOIN sys.database_principals r ON r.principal_id = m.role_principal_id
+    JOIN sys.database_principals u ON u.principal_id = m.member_principal_id
+  WHERE u.name = N'reader';"
