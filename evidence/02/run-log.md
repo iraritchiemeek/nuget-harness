@@ -130,3 +130,47 @@ The new service currently answers these requests with ASP.NET Core's default `40
 - new-service [44662729714](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44662729714): failed. It ran on the `.gitattributes` commit, before the re-record, so verification still saw the 5 normalised files.
 - The `lint` runs this session: 6 of 6 green.
 - Totals this session (`gh run list`): old-app 9 runs (8 pass, 1 fail), record 3 (2 pass, 1 fail), new-service 8 (5 pass, 3 fail), lint 6 (6 pass).
+
+## 2026-11-20 (UTC): session 4
+
+Work by a Claude Code agent session (session 4), after the human added amendments A1 to A3 to the spec. Final counts per check: `evidence/02/parity-report.md`.
+
+### A1, A2, A3 applied
+
+- **A1.** `recordings/parity-exclusions.txt` names the three non-GET requests with the reason. `compare.ps1 -Exclusions` skips them, lists them as `EXCLUDED` in every report, refuses a GET entry, and refuses an entry that is not a recorded request. The file is hashed in the manifest, so it changes only with a re-record. The service's `405` with `Allow: GET` is pinned by `Methods_other_than_GET_are_refused_with_405_and_Allow_GET`.
+- **A2.** `seed/state-b.txt`: Serilog 4.4.1-dev-02453, Polly 8.0.0-beta.2, xunit 2.5.2-pre.6, Serilog.Exceptions 8.4.0+build.694, Ninject 3.3.0-ci.15+sha.f4793a7. Real nuget.org versions of seeded IDs, found by scanning the seeded IDs' versions and nuspecs on nuget.org. The record workflow records state A, pushes the list, snapshots `state-b-snapshot`, restores it, and records state B.
+- **Credential gap.** The restored snapshot has no usable credential: the seed account's password and API key existed only in the seeding run. `push-state-b.ps1` registers a second account through the site's forms (`new-account.ps1`, moved out of `seed.ps1`). It then makes that account co-owner of the five IDs with one SQL row each in `PackageRegistrationOwners`, and pushes through the API. Without the row, the push is refused: `403` in exploratory run [44665262875](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44665262875). No package row is written by SQL.
+- **A3.** Requests added for whitespace IDs and prefixes, and for `%`, `_`, `[`, `]`, `^` and `~` in prefixes and IDs. The `+` in versions comes from state B (`8.4.0+build.694`, `3.3.0-ci.15+sha.f4793a7`). `Serilog+Sinks` in a path was tried and left out: IIS request filtering answers 404.11 before the app runs, the same class as the existing "not sent" group.
+
+### Runs
+
+| Run | Workflow | Result | What happened | Change that followed |
+|---|---|---|---|---|
+| [44665262875](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44665262875) | record (branch, no commit) | pass | Exploration. Both states recorded, 296 requests, passes identical. Push before the ownership grant: 403. SQL login on LocalDB works (`IsIntegratedSecurityOnly=0`). Whitespace IDs: IIS 404.4 page. | Requests finalised; branch deleted |
+| [44666187971](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44666187971) | record | pass | Committed both states. | |
+| [44666638638](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44666638638) | new-service | fail | `seed/state-b.txt` hash differed: the Windows checkout converted it to CRLF. | `.gitattributes`: `seed/state-b.txt -text` |
+| [44666951411](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44666951411) | record | pass, but committed nothing | `git add recordings/responses` failed (the folder was gone), and PowerShell carried on. | Stage only the state folders; fail if `git add` fails |
+| [44667487773](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44667487773) | record | **pass** | The current recording: 295 requests, two states. | |
+| [44667895990](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44667895990) | new-service | fail | Checks 3 and 7 ran: only the two whitespace IDs differ; 7 passes. The mutation job failed: from the repo root `dotnet` did not see `service/global.json` and used SDK 11.0.100, and the container publish picked win-x64. | Run `dotnet` from `service/`; `--os linux --arch x64` for the container |
+| [44668584932](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44668584932) | new-service | fail | `no-recordings-in-build.sh` reported recorded bodies inside the build. False positive: the HTML error bodies were used as `grep -f` patterns, and their blank lines match everything. | Search only single-line JSON bodies |
+| [44668840662](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44668840662) | new-service | fail (3 only) | Check 4 passes (9/9), check 5 passes, check 7 passes in both states. | |
+| [44667897238](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44667897238), [44668586117](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44668586117) | live-parity | fail | Phases A and B: only the two whitespace IDs differ. Then `random-requests.ps1` failed: the run ID used as a seed overflows Int32. Then the extra phase failed because the A1 exclusions were applied to a request set without those requests. | Seed taken modulo Int32; exclusions only for the committed set |
+| [44669109629](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44669109629) | live-parity | fail (2 records) | State A and B: 290/292. Extra phase: 326/326 identical. | |
+| [44669108406](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44669108406) | new-service | fail (3 only) | Checks 4, 5 and 7 pass; check 3 290/292 in each state. | |
+| [44668156090](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44668156090) | old-app | fail, then rerun | `restore-on-fresh-machine`: LocalDB "SQL Server process failed to start" in the gallery's setup script. The commit touched no Windows path. The failed job was rerun. | |
+
+Service quality: service-quality ran on every push. Stryker scored 90.91% with both test projects ([44667442365](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44667442365)); a unit-test-only run on the Mac scored 24%, because the SQL, endpoints and startup are reachable only through integration tests. CodeQL reported 0 results on every push. Lint passed on every push.
+
+### Decisions
+
+- **Recording layout**: `recordings/state-a`, `recordings/state-b`. The manifest adds `stateBList`, `stateBSnapshotRun` and `stateBSnapshotSha256`. The state B snapshot is read from the run named in the manifest, so it changes with each re-record. Artifacts expire after 90 days, so the state B snapshot needs a re-record by then. The seed snapshot expires on 2027-02-18.
+- **Check 4** runs the container image (`dotnet publish /t:PublishContainer`, base image pinned by digest) with `recordings/` moved out of the checkout before the build. Versions are compared as sets, because the old query has no ORDER BY. ID lists are compared in order.
+- **Check 5** plants the fault in the database, so the wrong response comes through the real capture path. It compares the service with itself before and after, so the two whitespace records cannot hide or fake the result.
+- **Check 7** compares row counts and `CHECKSUM_AGG(BINARY_CHECKSUM(*))` of every table, plus a SHA-256 of `Packages` and `PackageRegistrations` as ordered JSON.
+- **Check 6** publishes a self-contained win-x64 build on Linux. The gallery build parks .NET SDKs above 9 on the Windows runner, so `RuntimeIdentifiers` (linux-x64, win-x64) are restored, which keeps locked mode working. The service runs as a SQL login with `db_datareader` on LocalDB, started through WMI.
+- **Stryker** uses the MTP runner, which Stryker calls preview. It mutates every source file, with unit and integration tests.
+- **Integration tests** write rows only for themselves (IDs starting `ZzFilters`) in a throwaway container.
+
+### Open
+
+- The two whitespace-ID records (`parity-report.md`, "Open decision"). Checks 3 and 6 stay red on them alone.
