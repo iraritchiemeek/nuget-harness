@@ -1,6 +1,6 @@
 # Fixed seed list. Format: <Id> <normalized version as used by the nuget.org flat container>.
 # Generated once by scripts/make-seed-list.py, then committed and kept fixed.
-# Removed by hand-off from a run, not by a person: Nito.AsyncEx 0.13.0, which the gallery rejects on push
+# One line removed after generation: Nito.AsyncEx 0.13.0, which the gallery rejects on push
 # (400 "Invalid package version for a dependency with id 'Microsoft.Bcl.Async'", run 8).
 # Serilog
 Serilog 1.4.128
