@@ -13,3 +13,6 @@ updates:
     directory: /service
     schedule:
       interval: weekly
+    ignore:
+      # Held at the old app's own version (6.13.2), because parsing semVerLevel must match it.
+      - dependency-name: NuGet.Versioning
