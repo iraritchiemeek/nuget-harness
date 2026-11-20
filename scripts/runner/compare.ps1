@@ -1,30 +1,65 @@
-# Done-when check 5: responses after reset are byte-identical to responses before the change,
-# and the change in between really did alter at least one response.
-# Without -Changed (e.g. restoring the snapshot onto a fresh machine) only the byte comparison is made.
+# Compare two folders of records made by capture.ps1, record by record: the .meta file (status
+# and compared headers) and the .body file, byte for byte. Every difference is listed in the
+# report, with the differing header lines and the start of both bodies.
+# -Before is the expected side (for spec 02, the old app's recordings) and -After the actual side.
+# With -Changed (spec 01 check 5) the change in between must also have altered at least one record,
+# so that the comparison is not vacuous.
 param([Parameter(Mandatory)] [string]$Before, [string]$Changed, [Parameter(Mandatory)] [string]$After,
       [int]$CheckNumber = 5, [string]$Name = 'reset is exact', [string]$OutName = 'check5-reset.txt')
 . "$PSScriptRoot\common.ps1"
 $checkDir = Join-Path $OutDir 'checks'
 New-Item -ItemType Directory -Force -Path $checkDir | Out-Null
-function Get-DirectoryHash([string]$d) {
+
+function Get-DirectoryHash([string]$Dir) {
     $h = @{}
-    Get-ChildItem $d -File | ForEach-Object { $h[$_.Name] = (Get-FileHash $_.FullName -Algorithm SHA256).Hash }
+    Get-ChildItem $Dir -File | Where-Object { $_.Extension -in '.meta', '.body' } |
+        ForEach-Object { $h[$_.Name] = (Get-FileHash $_.FullName -Algorithm SHA256).Hash }
     return $h
 }
-$b = Get-DirectoryHash $Before; $a = Get-DirectoryHash $After; $c = if ($Changed) { Get-DirectoryHash $Changed } else { @{} }
-$names = @(@($b.Keys) + @($a.Keys) | Sort-Object -Unique)
-$lines = @(); $diffAfter = 0; $diffChanged = 0
-foreach ($n in $names) {
-    $sameAfter = $b[$n] -and ($b[$n] -eq $a[$n])
-    $sameChanged = (-not $Changed) -or ($b[$n] -eq $c[$n])
-    if (-not $sameAfter) { $diffAfter++ }
-    if (-not $sameChanged) { $diffChanged++ }
-    $lines += "$(if ($sameAfter) {'IDENTICAL'} else {'DIFFERENT'})  $n  before=$($b[$n])  after-reset=$($a[$n])  after-change=$($c[$n])"
+function Test-SameRecord($x, $y, [string]$Record) {
+    foreach ($ext in '.meta', '.body') {
+        $k = "$Record$ext"
+        if (-not $x.ContainsKey($k) -or -not $y.ContainsKey($k) -or $x[$k] -ne $y[$k]) { return $false }
+    }
+    return $true
 }
-$lines = @("files: $($names.Count)", "changed by mutation: $diffChanged", "different after reset: $diffAfter") + $lines
-$lines | Set-Content (Join-Path $checkDir $OutName) -Encoding utf8
-$ok = ($diffAfter -eq 0) -and ($names.Count -gt 0) -and ((-not $Changed) -or ($diffChanged -gt 0))
-$detail = "$($names.Count - $diffAfter)/$($names.Count) responses byte-identical after reset" + $(if ($Changed) { "; the mutation changed $diffChanged" } else { '' }) + " ($OutName)"
+# Show a body as text, with control characters escaped and long bodies cut.
+function Format-Body([string]$Path) {
+    if (-not (Test-Path $Path)) { return '(missing)' }
+    $text = [IO.File]::ReadAllText($Path)
+    $text = [regex]::Replace($text, '[\x00-\x1f]', { param($m) '\x{0:x2}' -f [int][char]$m.Value })
+    if ($text.Length -gt 400) { $text = $text.Substring(0, 400) + " ...($($text.Length) chars)" }
+    return $text
+}
+function Read-Meta([string]$Path) { if (Test-Path $Path) { return @(Get-Content $Path) } else { return @() } }
+
+$b = Get-DirectoryHash $Before; $a = Get-DirectoryHash $After
+$c = if ($Changed) { Get-DirectoryHash $Changed } else { @{} }
+$records = @(@($b.Keys) + @($a.Keys) | ForEach-Object { [IO.Path]::GetFileNameWithoutExtension($_) } | Sort-Object -Unique)
+$report = @(); $differ = 0; $changedCount = 0
+foreach ($r in $records) {
+    if ($Changed -and -not (Test-SameRecord $b $c $r)) { $changedCount++ }
+    if (Test-SameRecord $b $a $r) { continue }
+    $differ++
+    $bm = Read-Meta (Join-Path $Before "$r.meta"); $am = Read-Meta (Join-Path $After "$r.meta")
+    $request = if ($bm.Count) { $bm[0] } elseif ($am.Count) { $am[0] } else { $r }
+    $report += "DIFFERENT  $r  $request"
+    foreach ($d in Compare-Object $bm $am -CaseSensitive) {
+        $side = if ($d.SideIndicator -eq '<=') { 'expected' } else { 'actual  ' }
+        $report += "    meta $side  $($d.InputObject)"
+    }
+    if ($b["$r.body"] -ne $a["$r.body"]) {
+        $report += "    body expected  $(Format-Body (Join-Path $Before "$r.body"))"
+        $report += "    body actual    $(Format-Body (Join-Path $After "$r.body"))"
+    }
+}
+$summary = @("records: $($records.Count)", "different: $differ")
+if ($Changed) { $summary += "changed by the mutation: $changedCount" }
+@($summary + $report) | Set-Content (Join-Path $checkDir $OutName) -Encoding utf8
+$report | Select-Object -First 60 | Write-Host
+
+$ok = ($differ -eq 0) -and ($records.Count -gt 0) -and ((-not $Changed) -or ($changedCount -gt 0))
+$detail = "$($records.Count - $differ)/$($records.Count) records identical" + $(if ($Changed) { "; the mutation changed $changedCount" } else { '' }) + " ($OutName)"
 Write-Result $CheckNumber $Name $ok $detail
 Write-Summary "- $Name`: $(if ($ok) {'pass'} else {'FAIL'}) - $detail"
-if (-not $ok) { throw 'reset check failed' }
+if (-not $ok) { throw "$Name`: failed" }

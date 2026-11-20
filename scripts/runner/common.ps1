@@ -28,12 +28,15 @@ function Write-Summary([string]$Text) {
     Write-Host $Text
 }
 
-# curl.exe wrapper: -k because the site uses a self-signed cert.
+# On Windows, `curl` is an alias for Invoke-WebRequest, so name the real binary there.
+$Script:Curl = if ([Environment]::OSVersion.Platform -eq 'Win32NT') { 'curl.exe' } else { 'curl' }
+
+# curl wrapper: -k because the site uses a self-signed cert.
 # Returns @{ Status = <int>; Body = <path> }.
 function Invoke-Curl {
     param([string]$Path, [string]$OutFile, [string[]]$Extra = @())
     $url = if ($Path -match '^https?://') { $Path } else { "$BaseUrl$Path" }
-    $code = & curl.exe -sS -k --max-time 300 -o $OutFile -w '%{http_code}' @Extra $url
+    $code = & $Curl -sS -k --max-time 300 -o $OutFile -w '%{http_code}' @Extra $url
     return @{ Status = [int]$code; Body = $OutFile }
 }
 
@@ -64,6 +67,46 @@ function Invoke-Sql {
 function Get-PrefixList {
     return @(Get-Content (Join-Path $RepoRoot 'seed\prefixes.txt') |
         Where-Object { $_ -and -not $_.StartsWith('#') } | ForEach-Object { $_.Trim() })
+}
+
+# The spec 01 check requests: package-ids for every prefix, package-versions for every seeded ID.
+# Each item carries the check it belongs to (Kind) and the prefix or ID it asks about (Key).
+function Get-CheckRequest {
+    $expected = Get-Content (Join-Path $OutDir 'seed\expected.json') -Raw | ConvertFrom-Json
+    foreach ($p in Get-PrefixList) {
+        [pscustomobject]@{ Kind = 'ids'; Key = $p; Line = "GET /api/v2/package-ids?partialId=$([uri]::EscapeDataString($p))" }
+    }
+    foreach ($id in $expected.PSObject.Properties.Name) {
+        [pscustomobject]@{ Kind = 'versions'; Key = $id; Line = "GET /api/v2/package-versions/$([uri]::EscapeDataString($id))" }
+    }
+}
+
+# A record's file name: the first 16 hex digits of the SHA-256 of its request line, so names stay
+# the same when requests are added or reordered.
+function Get-RecordName([string]$Line) {
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { $hash = $sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($Line)) } finally { $sha.Dispose() }
+    return -join ($hash[0..7] | ForEach-Object { $_.ToString('x2') })
+}
+
+# Write text as UTF-8 without a BOM and with LF line ends, so Windows PowerShell 5.1 and pwsh on
+# Linux produce the same bytes.
+function Write-Utf8File([string]$Path, [string[]]$Lines) {
+    [IO.File]::WriteAllText($Path, (($Lines -join "`n") + "`n"), (New-Object Text.UTF8Encoding $false))
+}
+
+# SHA-256 over every file under -Dir: one "<hash>  <relative path>" line per file, sorted ordinally,
+# then hashed as UTF-8. Gives the same value on Windows and Linux for the same files.
+function Get-FolderDigest([string]$Dir) {
+    $root = (Resolve-Path $Dir).Path.TrimEnd('\', '/')
+    $lines = [string[]]@(Get-ChildItem $root -Recurse -File | ForEach-Object {
+        $rel = $_.FullName.Substring($root.Length + 1).Replace('\', '/')
+        "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $rel"
+    })
+    [Array]::Sort($lines, [StringComparer]::Ordinal)
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { $hash = $sha.ComputeHash([Text.Encoding]::UTF8.GetBytes(($lines -join "`n") + "`n")) } finally { $sha.Dispose() }
+    return -join ($hash | ForEach-Object { $_.ToString('x2') })
 }
 
 # Download one package from nuget.org's flat container into -CacheDir unless it is already there.

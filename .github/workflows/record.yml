@@ -1,0 +1,109 @@
+name: record
+
+# Spec 02: record the old app's answers to recordings/requests.txt. The pinned NuGetGallery runs on
+# windows-2022, restored from the seed snapshot. The request set is sent twice, and the two passes
+# must be byte-identical. Only then are the records and recordings/manifest.json committed, by
+# this workflow. Nothing else writes recordings/responses or the manifest.
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: Commit the recording to main (off for an exploratory run)
+        type: boolean
+        default: true
+  push:
+    branches: [main]
+    paths: ['recordings/requests.txt', 'recordings/ignored-headers.txt']
+
+permissions:
+  contents: read
+  actions: read # download seed-snapshot from the old-app run that made it
+
+concurrency:
+  group: record
+  cancel-in-progress: false
+
+env:
+  GALLERY_SHA: 63e6ee4202b441e1c904d6f78fc7b070f36bc24f
+  SNAPSHOT_RUN_ID: '44653627352'
+
+jobs:
+  record:
+    runs-on: windows-2022
+    timeout-minutes: 60
+    permissions:
+      contents: write # commit the recording
+      actions: read
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Build the gallery, or restore it from cache
+        uses: ./.github/actions/gallery-build
+        with:
+          gallery-sha: ${{ env.GALLERY_SHA }}
+
+      - name: Setup (gallery tools\Setup-DevEnvironment.ps1)
+        run: .\scripts\runner\setup.ps1
+
+      - name: Download seed-snapshot
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: seed-snapshot
+          path: snapshot
+          run-id: ${{ env.SNAPSHOT_RUN_ID }}
+          github-token: ${{ github.token }}
+
+      - name: Restore the snapshot and start the app
+        run: .\scripts\runner\reset.ps1 -Dir snapshot
+
+      - name: Record twice and compare the passes
+        run: |
+          .\scripts\runner\capture.ps1 -Requests recordings\requests.txt -Dir out\pass1
+          .\scripts\runner\capture.ps1 -Requests recordings\requests.txt -Dir out\pass2
+          .\scripts\runner\compare.ps1 -Before out\pass1 -After out\pass2 -CheckNumber 1 -Name 'two recording passes are byte-identical' -OutName record-passes.txt
+
+      - name: Save the SQL the old app sent (from the plan cache)
+        run: .\scripts\runner\dump-sql.ps1 -OutFile out\old-app-sql.txt
+
+      - name: Source and config diff of the old app
+        run: .\scripts\runner\source-diff.ps1
+
+      - name: Write the recording and its manifest
+        run: .\scripts\runner\write-manifest.ps1 -From out\pass1 -Snapshot snapshot
+
+      - name: Verify the manifest
+        run: .\scripts\runner\verify-recordings.ps1 -Snapshot snapshot -BeforeCommit
+
+      - name: Commit the recording
+        if: github.event_name == 'push' || inputs.commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add recordings/responses recordings/manifest.json
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) { Write-Host 'recording unchanged; nothing to commit'; exit 0 }
+          git commit -q -m "Record the old app's responses (run $env:GITHUB_RUN_ID)" -m "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+          git pull -q --rebase origin main
+          if ($LASTEXITCODE -ne 0) { throw 'rebase onto main failed' }
+          git push -q origin HEAD:main
+          if ($LASTEXITCODE -ne 0) { throw 'push failed' }
+
+      - name: Diagnostics
+        if: always()
+        run: .\scripts\runner\diagnostics.ps1
+
+      - name: Stop IIS Express
+        if: always()
+        run: .\scripts\runner\stop-site.ps1
+
+      - name: Upload the recording passes
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: recording
+          path: out/
+          if-no-files-found: warn

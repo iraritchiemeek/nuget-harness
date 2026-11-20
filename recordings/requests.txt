@@ -1,0 +1,304 @@
+# The request set for spec 02. Each line is "METHOD path"; # starts a comment.
+# The recording workflow sends every line to the old app (twice) and stores what comes back.
+# Each group names the old-app source it was read from. Paths are relative to
+# NuGetGallery at 63e6ee4202b441e1c904d6f78fc7b070f36bc24f, src/NuGetGallery/:
+#   App_Start/Routes.cs                            routes v2PackageIds and v2PackageVersions; no HTTP method constraint
+#   Controllers/ApiController.cs                   GetPackageIds / GetPackageVersions: [HttpGet], bind partialId|id,
+#                                                  bool? includePrerelease, bool? testData, string semVerLevel; JsonResult
+#   Queries/AutocompleteDatabasePackageIdsQuery.cs  Available+Listed, SemVer filter, prerelease filter; StartsWith,
+#                                                  GroupBy Id, OrderBy Id, Take 30; blank partialId -> top 30 by DownloadCount
+#   Queries/AutocompleteDatabasePackageVersionsQuery.cs  Id == id, same filters, no ORDER BY; blank id -> exception
+#   ../NuGetGallery.Core/SemVerLevelKey.cs          semVerLevel parsed with NuGetVersion.TryParse; >= 2.0.0 means SemVer2
+#   Web.config                                     httpRuntime requestPathInvalidCharacters, relaxedUrlToFileSystemMapping
+#
+# Not sent, on purpose:
+# - a blank package-versions id such as /api/v2/package-versions/%20. The query throws, and because the
+#   recording client is local (Request.IsLocal) the 500 body is the exception's stack trace, with file paths and
+#   line numbers of the machine that built the gallery. That is not a response a service can or should reproduce.
+# - path characters in requestPathInvalidCharacters (< > * % : \ ?) and encoded slashes. ASP.NET and IIS reject them
+#   before the app runs, and answer local clients with a detailed error page that includes the server's file paths.
+
+# Seeded prefixes, one per line of seed/prefixes.txt (spec 01 check 1). Source: AutocompleteDatabasePackageIdsQuery.cs
+GET /api/v2/package-ids?partialId=Serilog
+GET /api/v2/package-ids?partialId=Serilog.Sinks
+GET /api/v2/package-ids?partialId=Serilog.Enrichers
+GET /api/v2/package-ids?partialId=Newtonsoft
+GET /api/v2/package-ids?partialId=xunit
+GET /api/v2/package-ids?partialId=xunit.extensibility
+GET /api/v2/package-ids?partialId=NUnit
+GET /api/v2/package-ids?partialId=Polly
+GET /api/v2/package-ids?partialId=AutoMapper
+GET /api/v2/package-ids?partialId=Fluent
+GET /api/v2/package-ids?partialId=FluentValidation
+GET /api/v2/package-ids?partialId=Dapper
+GET /api/v2/package-ids?partialId=MediatR
+GET /api/v2/package-ids?partialId=Moq
+GET /api/v2/package-ids?partialId=Humanizer
+GET /api/v2/package-ids?partialId=NodaTime
+GET /api/v2/package-ids?partialId=RestSharp
+GET /api/v2/package-ids?partialId=Castle
+GET /api/v2/package-ids?partialId=Autofac
+GET /api/v2/package-ids?partialId=Microsoft.Extensions.Logging
+GET /api/v2/package-ids?partialId=Microsoft.Extensions.Configuration
+GET /api/v2/package-ids?partialId=Microsoft.Extensions.DependencyInjection
+GET /api/v2/package-ids?partialId=System.Collections
+GET /api/v2/package-ids?partialId=System.Text
+GET /api/v2/package-ids?partialId=Swashbuckle
+GET /api/v2/package-ids?partialId=Hangfire
+GET /api/v2/package-ids?partialId=Quartz
+GET /api/v2/package-ids?partialId=NLog
+GET /api/v2/package-ids?partialId=Nito
+GET /api/v2/package-ids?partialId=Refit
+GET /api/v2/package-ids?partialId=AutoFixture
+
+# Seeded IDs, one per ID in the snapshot's expected.json (spec 01 check 2). Source: AutocompleteDatabasePackageVersionsQuery.cs
+GET /api/v2/package-versions/Serilog
+GET /api/v2/package-versions/Serilog.AspNetCore
+GET /api/v2/package-versions/Serilog.Enrichers.Environment
+GET /api/v2/package-versions/Serilog.Enrichers.Thread
+GET /api/v2/package-versions/Serilog.Enrichers.Process
+GET /api/v2/package-versions/Serilog.Extensions.Hosting
+GET /api/v2/package-versions/Serilog.Extensions.Logging
+GET /api/v2/package-versions/Serilog.Formatting.Compact
+GET /api/v2/package-versions/Serilog.Settings.Configuration
+GET /api/v2/package-versions/Serilog.Sinks.Async
+GET /api/v2/package-versions/Serilog.Sinks.Console
+GET /api/v2/package-versions/Serilog.Sinks.Debug
+GET /api/v2/package-versions/Serilog.Sinks.File
+GET /api/v2/package-versions/Serilog.Sinks.PeriodicBatching
+GET /api/v2/package-versions/Serilog.Sinks.Seq
+GET /api/v2/package-versions/Serilog.Exceptions
+GET /api/v2/package-versions/Newtonsoft.Json
+GET /api/v2/package-versions/Newtonsoft.Json.Bson
+GET /api/v2/package-versions/Newtonsoft.Json.Schema
+GET /api/v2/package-versions/xunit
+GET /api/v2/package-versions/xunit.abstractions
+GET /api/v2/package-versions/xunit.analyzers
+GET /api/v2/package-versions/xunit.assert
+GET /api/v2/package-versions/xunit.core
+GET /api/v2/package-versions/xunit.extensibility.core
+GET /api/v2/package-versions/xunit.extensibility.execution
+GET /api/v2/package-versions/xunit.runner.console
+GET /api/v2/package-versions/xunit.runner.visualstudio
+GET /api/v2/package-versions/NUnit
+GET /api/v2/package-versions/NUnit3TestAdapter
+GET /api/v2/package-versions/NUnit.Analyzers
+GET /api/v2/package-versions/NUnitLite
+GET /api/v2/package-versions/Polly
+GET /api/v2/package-versions/Polly.Core
+GET /api/v2/package-versions/Polly.Extensions
+GET /api/v2/package-versions/Polly.Extensions.Http
+GET /api/v2/package-versions/Polly.Contrib.WaitAndRetry
+GET /api/v2/package-versions/Polly.RateLimiting
+GET /api/v2/package-versions/AutoMapper
+GET /api/v2/package-versions/AutoMapper.Collection
+GET /api/v2/package-versions/AutoMapper.Extensions.Microsoft.DependencyInjection
+GET /api/v2/package-versions/FluentValidation
+GET /api/v2/package-versions/FluentValidation.AspNetCore
+GET /api/v2/package-versions/FluentValidation.DependencyInjectionExtensions
+GET /api/v2/package-versions/FluentAssertions
+GET /api/v2/package-versions/FluentMigrator
+GET /api/v2/package-versions/FluentMigrator.Runner
+GET /api/v2/package-versions/Dapper
+GET /api/v2/package-versions/Dapper.Contrib
+GET /api/v2/package-versions/Dapper.SqlBuilder
+GET /api/v2/package-versions/MediatR
+GET /api/v2/package-versions/MediatR.Contracts
+GET /api/v2/package-versions/MediatR.Extensions.Microsoft.DependencyInjection
+GET /api/v2/package-versions/Moq
+GET /api/v2/package-versions/Moq.AutoMock
+GET /api/v2/package-versions/Humanizer.Core
+GET /api/v2/package-versions/Humanizer.Core.fr
+GET /api/v2/package-versions/Humanizer.Core.de
+GET /api/v2/package-versions/Humanizer.Core.ja
+GET /api/v2/package-versions/NodaTime
+GET /api/v2/package-versions/NodaTime.Serialization.JsonNet
+GET /api/v2/package-versions/NodaTime.Testing
+GET /api/v2/package-versions/CsvHelper
+GET /api/v2/package-versions/RestSharp
+GET /api/v2/package-versions/RestSharp.Serializers.NewtonsoftJson
+GET /api/v2/package-versions/StackExchange.Redis
+GET /api/v2/package-versions/Castle.Core
+GET /api/v2/package-versions/Castle.Windsor
+GET /api/v2/package-versions/Autofac
+GET /api/v2/package-versions/Autofac.Extensions.DependencyInjection
+GET /api/v2/package-versions/Autofac.Mvc5
+GET /api/v2/package-versions/Autofac.WebApi2
+GET /api/v2/package-versions/Microsoft.Extensions.Logging
+GET /api/v2/package-versions/Microsoft.Extensions.Logging.Abstractions
+GET /api/v2/package-versions/Microsoft.Extensions.Logging.Configuration
+GET /api/v2/package-versions/Microsoft.Extensions.Logging.Console
+GET /api/v2/package-versions/Microsoft.Extensions.Logging.Debug
+GET /api/v2/package-versions/Microsoft.Extensions.Logging.EventLog
+GET /api/v2/package-versions/Microsoft.Extensions.Logging.EventSource
+GET /api/v2/package-versions/Microsoft.Extensions.Logging.TraceSource
+GET /api/v2/package-versions/Microsoft.Extensions.Configuration
+GET /api/v2/package-versions/Microsoft.Extensions.Configuration.Abstractions
+GET /api/v2/package-versions/Microsoft.Extensions.Configuration.Binder
+GET /api/v2/package-versions/Microsoft.Extensions.Configuration.CommandLine
+GET /api/v2/package-versions/Microsoft.Extensions.Configuration.EnvironmentVariables
+GET /api/v2/package-versions/Microsoft.Extensions.Configuration.FileExtensions
+GET /api/v2/package-versions/Microsoft.Extensions.Configuration.Json
+GET /api/v2/package-versions/Microsoft.Extensions.Configuration.UserSecrets
+GET /api/v2/package-versions/Microsoft.Extensions.Configuration.Xml
+GET /api/v2/package-versions/Microsoft.Extensions.Configuration.Ini
+GET /api/v2/package-versions/Microsoft.Extensions.DependencyInjection
+GET /api/v2/package-versions/Microsoft.Extensions.DependencyInjection.Abstractions
+GET /api/v2/package-versions/Microsoft.Extensions.Primitives
+GET /api/v2/package-versions/System.Collections
+GET /api/v2/package-versions/System.Collections.Concurrent
+GET /api/v2/package-versions/System.Collections.Immutable
+GET /api/v2/package-versions/System.Collections.NonGeneric
+GET /api/v2/package-versions/System.Collections.Specialized
+GET /api/v2/package-versions/System.Text.Encoding
+GET /api/v2/package-versions/System.Text.Encoding.Extensions
+GET /api/v2/package-versions/System.Text.Encodings.Web
+GET /api/v2/package-versions/System.Text.Json
+GET /api/v2/package-versions/System.Text.RegularExpressions
+GET /api/v2/package-versions/System.Memory
+GET /api/v2/package-versions/System.Buffers
+GET /api/v2/package-versions/System.Numerics.Vectors
+GET /api/v2/package-versions/System.Runtime.CompilerServices.Unsafe
+GET /api/v2/package-versions/System.Threading.Tasks.Extensions
+GET /api/v2/package-versions/Bogus
+GET /api/v2/package-versions/Swashbuckle.AspNetCore
+GET /api/v2/package-versions/Swashbuckle.AspNetCore.Swagger
+GET /api/v2/package-versions/Swashbuckle.AspNetCore.SwaggerGen
+GET /api/v2/package-versions/Swashbuckle.AspNetCore.SwaggerUI
+GET /api/v2/package-versions/HtmlAgilityPack
+GET /api/v2/package-versions/Hangfire.Core
+GET /api/v2/package-versions/Hangfire.SqlServer
+GET /api/v2/package-versions/Quartz
+GET /api/v2/package-versions/Quartz.Extensions.Hosting
+GET /api/v2/package-versions/YamlDotNet
+GET /api/v2/package-versions/SharpZipLib
+GET /api/v2/package-versions/DotNetZip
+GET /api/v2/package-versions/log4net
+GET /api/v2/package-versions/NLog
+GET /api/v2/package-versions/NLog.Extensions.Logging
+GET /api/v2/package-versions/NLog.Web.AspNetCore
+GET /api/v2/package-versions/Spectre.Console
+GET /api/v2/package-versions/CommandLineParser
+GET /api/v2/package-versions/MimeKit
+GET /api/v2/package-versions/MailKit
+GET /api/v2/package-versions/Ardalis.GuardClauses
+GET /api/v2/package-versions/Ardalis.Specification
+GET /api/v2/package-versions/OneOf
+GET /api/v2/package-versions/Scrutor
+GET /api/v2/package-versions/Refit
+GET /api/v2/package-versions/Refit.HttpClientFactory
+GET /api/v2/package-versions/Nito.AsyncEx
+GET /api/v2/package-versions/Nito.AsyncEx.Coordination
+GET /api/v2/package-versions/Nito.Disposables
+GET /api/v2/package-versions/Ninject
+GET /api/v2/package-versions/Unity
+GET /api/v2/package-versions/SimpleInjector
+GET /api/v2/package-versions/Shouldly
+GET /api/v2/package-versions/NSubstitute
+GET /api/v2/package-versions/AutoFixture
+GET /api/v2/package-versions/AutoFixture.Xunit2
+GET /api/v2/package-versions/AutoFixture.AutoMoq
+GET /api/v2/package-versions/stateless
+GET /api/v2/package-versions/Polly.Caching.Memory
+
+# includePrerelease true/false/absent x semVerLevel 2.0.0/absent, on both endpoints. Source: ApiController.cs, SemVerLevelKey.cs
+GET /api/v2/package-ids?partialId=Serilog&includePrerelease=true
+GET /api/v2/package-ids?partialId=Serilog&includePrerelease=false
+GET /api/v2/package-ids?partialId=Serilog&semVerLevel=2.0.0
+GET /api/v2/package-ids?partialId=Serilog&includePrerelease=true&semVerLevel=2.0.0
+GET /api/v2/package-ids?partialId=Serilog&includePrerelease=false&semVerLevel=2.0.0
+GET /api/v2/package-versions/Serilog?includePrerelease=true
+GET /api/v2/package-versions/Serilog?includePrerelease=false
+GET /api/v2/package-versions/Serilog?semVerLevel=2.0.0
+GET /api/v2/package-versions/Serilog?includePrerelease=true&semVerLevel=2.0.0
+GET /api/v2/package-versions/Serilog?includePrerelease=false&semVerLevel=2.0.0
+
+# Flag values the binders and the SemVer parser treat in their own ways. Source: ApiController.cs (bool? binding), SemVerLevelKey.cs
+GET /api/v2/package-ids?partialId=Polly&includePrerelease=True
+GET /api/v2/package-ids?partialId=Polly&includePrerelease=TRUE
+GET /api/v2/package-ids?partialId=Polly&includePrerelease=1
+GET /api/v2/package-ids?partialId=Polly&includePrerelease=yes
+GET /api/v2/package-ids?partialId=Polly&includePrerelease=
+GET /api/v2/package-ids?partialId=Polly&semVerLevel=1.0.0
+GET /api/v2/package-ids?partialId=Polly&semVerLevel=2.0.0-beta
+GET /api/v2/package-ids?partialId=Polly&semVerLevel=2
+GET /api/v2/package-ids?partialId=Polly&semVerLevel=2.0
+GET /api/v2/package-ids?partialId=Polly&semVerLevel=2.0.0.0
+GET /api/v2/package-ids?partialId=Polly&semVerLevel=3.0.0
+GET /api/v2/package-ids?partialId=Polly&semVerLevel=banana
+GET /api/v2/package-ids?partialId=Polly&semVerLevel=
+GET /api/v2/package-ids?partialId=Polly&testData=true
+GET /api/v2/package-versions/Polly?includePrerelease=yes
+GET /api/v2/package-versions/Polly?semVerLevel=2
+GET /api/v2/package-versions/Polly?semVerLevel=banana
+GET /api/v2/package-versions/Polly?testData=true
+
+# Casing of IDs, prefixes, parameter names and the route. Source: database collation (SQL_Latin1_General_CP1_CI_AS)
+# decides LIKE and = in AutocompleteDatabase*Query.cs; MVC matches routes and query keys case-insensitively (Routes.cs)
+GET /api/v2/package-ids?partialId=serilog
+GET /api/v2/package-ids?partialId=SERILOG
+GET /api/v2/package-ids?partialId=sErIlOg.SiNkS
+GET /api/v2/package-ids?partialid=Serilog
+GET /api/v2/package-ids?PARTIALID=Serilog
+GET /api/v2/package-ids?partialId=Serilog&INCLUDEPRERELEASE=true&SEMVERLEVEL=2.0.0
+GET /API/V2/PACKAGE-IDS?partialId=Serilog
+GET /api/v2/package-versions/serilog
+GET /api/v2/package-versions/SERILOG
+GET /api/v2/package-versions/newtonsoft.json
+GET /api/v2/package-versions/NEWTONSOFT.JSON
+GET /API/V2/Package-Versions/Serilog
+
+# partialId empty, blank and missing. Source: AutocompleteDatabasePackageIdsQuery.cs (string.IsNullOrWhiteSpace branch)
+GET /api/v2/package-ids
+GET /api/v2/package-ids?partialId=
+GET /api/v2/package-ids?partialId=%20
+GET /api/v2/package-ids?partialId=+
+GET /api/v2/package-ids?includePrerelease=true&semVerLevel=2.0.0
+
+# Matches nothing, and an unknown ID. Source: AutocompleteDatabase*Query.cs
+GET /api/v2/package-ids?partialId=zzzz
+GET /api/v2/package-ids?partialId=Serilog.Sinks.Nope
+GET /api/v2/package-versions/Does.Not.Exist
+GET /api/v2/package-versions/Serilog.Sinks
+
+# More than 30 matching IDs, so Take(30) applies (S matches 42 seeded IDs). Source: AutocompleteDatabasePackageIdsQuery.cs
+GET /api/v2/package-ids?partialId=S
+GET /api/v2/package-ids?partialId=s
+
+# Dots, dashes, underscores, LIKE wildcards, URL-encoded characters and trailing slashes. Source: StartsWith in
+# AutocompleteDatabasePackageIdsQuery.cs (Entity Framework turns it into LIKE), {id} in Routes.cs, Web.config httpRuntime
+GET /api/v2/package-ids?partialId=Serilog.
+GET /api/v2/package-ids?partialId=Serilog.Sinks.
+GET /api/v2/package-ids?partialId=.
+GET /api/v2/package-ids?partialId=Serilog_Sinks
+GET /api/v2/package-ids?partialId=Serilog-Sinks
+GET /api/v2/package-ids?partialId=_
+GET /api/v2/package-ids?partialId=-
+GET /api/v2/package-ids?partialId=Seri_og
+GET /api/v2/package-ids?partialId=Serilog%5FSinks
+GET /api/v2/package-ids?partialId=Serilog%2ESinks
+GET /api/v2/package-ids?partialId=Serilog%25
+GET /api/v2/package-ids?partialId=%25
+GET /api/v2/package-ids?partialId=Serilog%5BS%5D
+GET /api/v2/package-ids?partialId=%5BS%5D
+GET /api/v2/package-ids?partialId=Serilog~
+GET /api/v2/package-ids?partialId=Serilog+Sinks
+GET /api/v2/package-ids?partialId=Serilog%2BSinks
+GET /api/v2/package-ids?partialId=Serilog%2F
+GET /api/v2/package-ids?partialId=%C3%A9
+GET /api/v2/package-ids?partialId=Serilog&partialId=Polly
+GET /api/v2/package-ids/?partialId=Serilog
+GET /api/v2/package-versions/Serilog/
+GET /api/v2/package-versions/Serilog.Sinks.Console/
+GET /api/v2/package-versions/Serilog%2ESinks%2EConsole
+GET /api/v2/package-versions/Serilog_Sinks_Console
+GET /api/v2/package-versions/Serilog-Sinks-Console
+GET /api/v2/package-versions/Seri%6Cog
+GET /api/v2/package-versions/Serilog.
+GET /api/v2/package-versions/Serilog%20
+GET /api/v2/package-versions/Serilog/extra
+
+# Methods other than GET. Source: [HttpGet] on both actions in ApiController.cs; the routes in Routes.cs accept any method
+POST /api/v2/package-ids?partialId=Serilog
+DELETE /api/v2/package-versions/Serilog
+PUT /api/v2/package-versions/Serilog

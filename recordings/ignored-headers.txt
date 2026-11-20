@@ -1,0 +1,3 @@
+# Response headers that are not compared, one per line: the header name, then the reason.
+# Every other header the old app sends is recorded and compared byte for byte.
+date  The time the response was sent; differs on every request.
