@@ -46,7 +46,7 @@ internal static class PackageEndpoints
     }
 
     internal static async Task<
-        Results<JsonHttpResult<IReadOnlyList<string>>, StatusCodeHttpResult>
+        Results<JsonHttpResult<IReadOnlyList<string>>, NotFound>
     > GetPackageVersionsAsync(
         string id,
         HttpRequest request,
@@ -54,12 +54,12 @@ internal static class PackageEndpoints
         CancellationToken cancellationToken
     )
     {
-        // The old query throws ArgumentNullException for a blank id, and the controller answers 500
-        // (AutocompleteDatabasePackageVersionsQuery.cs). Its body is not reproduced: for a local
-        // client it is a stack trace, and the request is not in the recorded set (recordings/requests.txt).
+        // A blank id never reaches the old app's code: IIS trims the trailing spaces, finds no route
+        // and answers 404.4 with its own error page (recorded for %20 and %20%20). The status is
+        // matched; the page is not copied, as it describes the hosting machine (spec 02 amendment A4).
         if (string.IsNullOrWhiteSpace(id))
         {
-            return TypedResults.StatusCode(StatusCodes.Status500InternalServerError);
+            return TypedResults.NotFound();
         }
 
         var versions = await queries.GetPackageVersionsAsync(

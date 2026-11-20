@@ -48,18 +48,27 @@ public sealed class PackageEndpointTests(GalleryDatabase database) : IAsyncDispo
         Assert.Equal(30, (await GetJsonAsync("/api/v2/package-ids?partialId=%20")).Length);
     }
 
-    // AutocompleteDatabasePackageVersionsQuery.cs throws for a blank id, and the controller answers
-    // 500. Over HTTP the old app's host (IIS) answers first: it trims the trailing spaces and replies
-    // 404.4 (recordings/requests.txt, A3). Which of the two the service should copy is undecided.
-    [Fact]
-    public async Task A_blank_id_is_answered_500_as_the_old_query_throws()
+    // Over HTTP a blank id never reaches the old app's code: IIS trims the trailing spaces and
+    // answers 404.4 with its own error page. Spec 02 amendment A4: the parity checks compare only
+    // the status of these records (recordings/parity-exclusions.txt), so the service's own response,
+    // an empty 404 with the gallery headers, is pinned here.
+    [Theory]
+    [InlineData("/api/v2/package-versions/%20")]
+    [InlineData("/api/v2/package-versions/%20%20")]
+    public async Task A_blank_id_is_not_found_with_an_empty_body(string path)
     {
         using var client = _app.CreateClient();
         using var response = await client.GetAsync(
-            new Uri("/api/v2/package-versions/%20", UriKind.Relative),
+            new Uri(path, UriKind.Relative),
             TestContext.Current.CancellationToken
         );
-        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Null(response.Content.Headers.ContentType);
+        Assert.Empty(
+            await response.Content.ReadAsByteArrayAsync(TestContext.Current.CancellationToken)
+        );
+        Assert.Equal("private", response.Headers.CacheControl?.ToString());
+        Assert.Equal("deny", Assert.Single(response.Headers.GetValues("X-Frame-Options")));
     }
 
     [Fact]
