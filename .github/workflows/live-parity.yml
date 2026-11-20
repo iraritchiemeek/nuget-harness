@@ -1,0 +1,121 @@
+name: live-parity
+
+# Spec 02 done-when 6: the old app and the new service side by side on one windows-2022 runner,
+# reading the same LocalDB database, must give byte-identical answers:
+#   1. state A (the seed snapshot), every recorded request
+#   2. state B (seed/state-b.txt pushed through the old app), every recorded request
+#   3. after more pushes through the old app (seed/live-parity-extra.txt), requests the committed
+#      set does not contain: scripts/live-parity-requests.txt and a seeded random set
+# Run at milestones and at the end, by hand.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read # download seed-snapshot
+
+env:
+  GALLERY_SHA: 63e6ee4202b441e1c904d6f78fc7b070f36bc24f
+  SNAPSHOT_RUN_ID: '44653627352'
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+jobs:
+  # The gallery build on the Windows runner parks every .NET SDK above 9, so the service is
+  # published here as a self-contained win-x64 build.
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          global-json-file: service/global.json
+      - run: dotnet publish service/src/GalleryReadService -c Release -r win-x64 --self-contained -o "$RUNNER_TEMP/service"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: service-win-x64
+          path: ${{ runner.temp }}/service
+          if-no-files-found: error
+
+  live:
+    needs: publish
+    runs-on: windows-2022
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Build the gallery, or restore it from cache
+        uses: ./.github/actions/gallery-build
+        with:
+          gallery-sha: ${{ env.GALLERY_SHA }}
+
+      - name: Setup (gallery tools\Setup-DevEnvironment.ps1)
+        run: .\scripts\runner\setup.ps1
+
+      - name: Download seed-snapshot
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: seed-snapshot
+          path: snapshot
+          run-id: ${{ env.SNAPSHOT_RUN_ID }}
+          github-token: ${{ github.token }}
+
+      - name: Download the service
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: service-win-x64
+          path: ${{ runner.temp }}\service
+
+      - name: Restore state A and start the old app and the service
+        run: |
+          .\scripts\runner\reset.ps1 -Dir snapshot
+          .\scripts\runner\start-service.ps1 -ServiceDir "$env:RUNNER_TEMP\service"
+
+      - name: 'Check 6, state A: every recorded request'
+        run: .\scripts\runner\live-compare.ps1 -Requests recordings\requests.txt -Name state-a
+
+      - name: 'State B: push seed/state-b.txt through the old app'
+        if: always()
+        run: .\scripts\runner\push-state-b.ps1
+
+      - name: 'Check 6, state B: every recorded request'
+        if: always()
+        run: .\scripts\runner\live-compare.ps1 -Requests recordings\requests.txt -Name state-b
+
+      - name: More pushes through the old app, and requests outside the committed set
+        if: always()
+        run: |
+          .\scripts\runner\mutate.ps1 -List seed\live-parity-extra.txt
+          .\scripts\runner\random-requests.ps1 -Seed $env:GITHUB_RUN_ID -OutFile out\random-requests.txt
+          Get-Content scripts\live-parity-requests.txt, out\random-requests.txt | Set-Content out\extra-requests.txt -Encoding ascii
+
+      - name: 'Check 6, after the extra pushes: requests the committed set does not contain'
+        if: always()
+        run: .\scripts\runner\live-compare.ps1 -Requests out\extra-requests.txt -Name extra
+
+      - name: Diagnostics
+        if: always()
+        run: .\scripts\runner\diagnostics.ps1
+
+      - name: Stop IIS Express and the service
+        if: always()
+        run: |
+          .\scripts\runner\stop-site.ps1
+          Get-Process GalleryReadService -ErrorAction SilentlyContinue | Stop-Process -Force
+
+      - name: Secret scan of the outputs
+        if: always()
+        run: .\scripts\runner\secret-scan.ps1 -Dir out
+
+      - name: Upload outputs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: live-parity
+          path: out/
+          if-no-files-found: warn

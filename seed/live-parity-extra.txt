@@ -1,0 +1,14 @@
+# Spec 02 check 6: real nuget.org packages pushed through the old app after the state B pushes, so
+# live parity covers data the recordings never saw. Same format as seed/packages.txt.
+# A new ID under an existing prefix (as spec 01's mutate.ps1).
+Serilog.Sinks.Trace 4.0.0
+# IDs with dashes, under existing prefixes.
+Polly-Signed 5.9.0
+Castle.Core-Serilog 5.2.1
+Dapper-QueryBuilder 2.0.0
+# An ID with an underscore.
+le_nlog 2.2.1
+# A new ID whose only version is a dotted prerelease with a build number (SemVer 2.0.0).
+dotnet-xunit 2.4.0-beta.1.build3958
+# Another build-metadata version of an ID state B already touched (nuspec 8.3.0+build.654).
+Serilog.Exceptions 8.3.0

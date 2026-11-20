@@ -1,0 +1,29 @@
+# Spec 02 check 6: fixed requests about the data seed/live-parity-extra.txt adds, none of them in
+# recordings/requests.txt. random-requests.ps1 adds a generated set on top.
+GET /api/v2/package-ids?partialId=Serilog.Sinks.T
+GET /api/v2/package-ids?partialId=Polly-
+GET /api/v2/package-ids?partialId=Polly%2D
+GET /api/v2/package-ids?partialId=polly-signed
+GET /api/v2/package-ids?partialId=Castle.Core-
+GET /api/v2/package-ids?partialId=Dapper-
+GET /api/v2/package-ids?partialId=le_
+GET /api/v2/package-ids?partialId=le%5F
+GET /api/v2/package-ids?partialId=l
+GET /api/v2/package-ids?partialId=dotnet
+GET /api/v2/package-ids?partialId=dotnet&includePrerelease=true
+GET /api/v2/package-ids?partialId=dotnet&semVerLevel=2.0.0
+GET /api/v2/package-ids?partialId=dotnet&includePrerelease=true&semVerLevel=2.0.0
+GET /api/v2/package-ids?partialId=D&includePrerelease=true&semVerLevel=2.0.0
+GET /api/v2/package-versions/Serilog.Sinks.Trace
+GET /api/v2/package-versions/Polly-Signed
+GET /api/v2/package-versions/POLLY-SIGNED
+GET /api/v2/package-versions/Castle.Core-Serilog
+GET /api/v2/package-versions/Dapper-QueryBuilder
+GET /api/v2/package-versions/le_nlog
+GET /api/v2/package-versions/le%5Fnlog
+GET /api/v2/package-versions/dotnet-xunit
+GET /api/v2/package-versions/dotnet-xunit?includePrerelease=true
+GET /api/v2/package-versions/dotnet-xunit?includePrerelease=true&semVerLevel=2.0.0
+GET /api/v2/package-versions/Serilog.Exceptions?includePrerelease=true&semVerLevel=2.0.0&testData=true
+GET /api/v2/package-versions/serilog.exceptions?semVerLevel=2.0.0
+GET /api/v2/package-ids?includePrerelease=true
