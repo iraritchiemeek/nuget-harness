@@ -1,12 +1,22 @@
 name: new-service
 
 # Spec 02: the new read service, checked against the old app's recordings on Linux.
+#
+# A push that changes a recording input (the paths that start record.yml) makes the committed
+# manifest stale until record.yml commits the new recording, so on such a push the checks are
+# skipped (job `inputs`), not run against the stale manifest. They run instead when record.yml
+# completes on main, against main as the recording run left it. A record run that fails also
+# starts them, so such a push always ends in a run of these checks, green or red.
 
 on:
   workflow_dispatch:
   push:
     branches: [main]
     paths-ignore: ['**.md', 'specs/**']
+  workflow_run:
+    workflows: [record]
+    types: [completed]
+    branches: [main]
 
 permissions:
   contents: read
@@ -18,11 +28,41 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
 
 jobs:
+  # Whether this push changed a recording input. The list is record.yml's push paths.
+  inputs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      rerecord: ${{ steps.diff.outputs.rerecord }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        if: github.event_name == 'push'
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: diff
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          rerecord=false
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            changed=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" -- recordings/requests.txt recordings/ignored-headers.txt \
+              recordings/parity-exclusions.txt recordings/approved-differences.json seed/state-b.txt)
+            if [ -n "$changed" ]; then
+              rerecord=true
+              echo "Recording inputs changed; these checks run when record.yml has committed the new recording:" >> "$GITHUB_STEP_SUMMARY"
+              while read -r file; do echo "- $file"; done <<< "$changed" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+          echo "rerecord=$rerecord" >> "$GITHUB_OUTPUT"
+
   # Done-when 3 and 7, in both data states (amendment A2): restore the state's snapshot into SQL
   # Server, start the service as the read-only login, send every recorded request, and require
   # every record to match, after the approved differences (spec 02b). The database fingerprint
   # before and after must be identical.
   recordings:
+    needs: inputs
+    if: needs.inputs.outputs.rerecord != 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
@@ -95,6 +135,8 @@ jobs:
   # must hold none of them. The container then serves state A, change-data.sql changes the database
   # directly, and the affected responses must change exactly as the data says.
   data-change:
+    needs: inputs
+    if: needs.inputs.outputs.rerecord != 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -160,6 +202,8 @@ jobs:
   # exclusions and the approved differences). Five planted faults, each of which must be reported
   # alone and for its reason.
   negative-control:
+    needs: inputs
+    if: needs.inputs.outputs.rerecord != 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
