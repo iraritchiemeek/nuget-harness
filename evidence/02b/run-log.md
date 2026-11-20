@@ -70,7 +70,7 @@ The old queries were checked for other places where the answer depends on chance
   - `new-service` also runs on `workflow_run` when `record` completes on `main`, whether the run succeeded or failed. It then checks `main` as the recording run left it.
   - The bot's commit is pushed with `GITHUB_TOKEN` and starts no workflow, which is why the trigger is the record run's completion, not the bot's push.
 - **Nothing is weakened.** Every push that changes inputs still ends in a full new-service run against the new recording. If the re-record fails, the run still happens and is red.
-- **Proof:** see Runs.
+- **Proof (in progress at hand-off):** `dab23b2` changes a comment in `parity-exclusions.txt`. Its new-service run [44687279424](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44687279424) should skip the checks, and record [44687279180](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44687279180) should then start a `workflow_run` new-service run.
 
 ### Probe branches
 
