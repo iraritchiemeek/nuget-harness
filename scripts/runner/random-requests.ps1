@@ -4,9 +4,9 @@
 #   package-versions: a random ID, with random letters upper-cased
 # plus a random includePrerelease (absent, true, false, yes) and semVerLevel (absent, 1.0.0, 2.0.0, 2).
 # Lines already in recordings/requests.txt are dropped.
-param([Parameter(Mandatory)] [int]$Seed, [int]$Count = 300, [Parameter(Mandatory)] [string]$OutFile)
+param([Parameter(Mandatory)] [long]$Seed, [int]$Count = 300, [Parameter(Mandatory)] [string]$OutFile)
 . "$PSScriptRoot\common.ps1"
-$random = New-Object System.Random $Seed
+$random = New-Object System.Random ([int]($Seed % [int]::MaxValue))   # run IDs exceed Int32
 $ids = [string[]]@(Invoke-Sql -Database 'NuGetGallery' 'SELECT Id FROM dbo.PackageRegistrations' | ForEach-Object { $_.Id })
 [Array]::Sort($ids, [StringComparer]::Ordinal)   # the generator's input order must not depend on the query plan
 $committed = @{}
