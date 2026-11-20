@@ -14,5 +14,5 @@ foreach ($e in $entries) {
     $file = Get-SeedPackage -Id $e.Id -Version $e.Version -CacheDir $env:RUNNER_TEMP
     $code = Publish-Package -File $file -ApiKey $apiKey
     if ($code -ne 201) { throw "push of $($e.Id) $($e.Version) returned $code" }
-    Write-Summary "- mutate: pushed extra package $($e.Id) $($e.Version)"
+    Write-Summary "- extra push: pushed package $($e.Id) $($e.Version)"
 }
