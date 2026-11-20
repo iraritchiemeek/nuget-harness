@@ -9,10 +9,12 @@ name: record
 # Two jobs, so that the long one cannot write to the repository:
 #   record  read-only. Records, assembles the recording and its manifest (write-manifest.ps1),
 #           checks them, and uploads them as the artifact "recording": exactly the tree that is
-#           committed as recordings/. verify-recordings.ps1 compares recordings/ with that artifact
-#           on every later run.
-#   commit  checks the artifact again, adds the state B snapshot to the snapshots-v1 release, and
-#           commits the recording. Nothing else writes recordings/state-a, recordings/state-b or the manifest.
+#           committed as recordings/.
+#   commit  checks the artifact again, adds the state B snapshot to the snapshots-v1 release, keeps
+#           the recording as the asset of the release recordings-<run id> (artifacts expire; releases
+#           don't), and commits the recording. verify-recordings.ps1 compares recordings/ with that
+#           asset on every later run. Nothing else writes recordings/state-a, recordings/state-b or
+#           the manifest.
 
 on:
   workflow_dispatch:
@@ -140,7 +142,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
-      contents: write # push the recording, and add the state B snapshot to the snapshots-v1 release
+      contents: write # push the recording, and create or add to its releases
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -181,6 +183,31 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'tar failed' }
           gh release upload $SnapshotRelease $asset --clobber
           if ($LASTEXITCODE -ne 0) { throw 'release upload failed' }
+
+      - name: Keep the recording in the release recordings-<run id>
+        shell: pwsh
+        run: |
+          # A re-run of this run finds the release already there; its asset must then be the same
+          # recording, and is never replaced.
+          . ./scripts/runner/common.ps1
+          $tag = Get-RecordingReleaseTag "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+          $asset = Join-Path $env:RUNNER_TEMP "$tag.tar.gz"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            $kept = Join-Path $env:RUNNER_TEMP 'kept'
+            New-Item -ItemType Directory -Path $kept | Out-Null
+            gh release download $tag --pattern "$tag.tar.gz" --dir $env:RUNNER_TEMP
+            if ($LASTEXITCODE -ne 0) { throw "release $tag exists but its asset could not be downloaded" }
+            tar -xzf $asset -C $kept
+            if ($LASTEXITCODE -ne 0) { throw 'tar failed' }
+            if ((Get-FolderDigest $kept) -ne (Get-FolderDigest "$env:RUNNER_TEMP/recording")) { throw "release $tag already holds a different recording" }
+            Write-Host "release $tag already holds this recording"
+          } else {
+            tar -czf $asset -C "$env:RUNNER_TEMP/recording" .
+            if ($LASTEXITCODE -ne 0) { throw 'tar failed' }
+            gh release create $tag $asset --target $env:GITHUB_SHA --title "Recording of run $env:GITHUB_RUN_ID" --notes "The recordings folder committed by $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID. scripts/runner/verify-recordings.ps1 compares recordings/ with this asset."
+            if ($LASTEXITCODE -ne 0) { throw 'release create failed' }
+          }
 
       - name: Commit the recording
         shell: pwsh

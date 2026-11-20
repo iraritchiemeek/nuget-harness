@@ -10,7 +10,7 @@ on:
 
 permissions:
   contents: read
-  actions: read # verify-recordings.ps1 reads the recording run and downloads its artifact
+  actions: read # verify-recordings.ps1 reads the recording run
 
 env:
   GH_TOKEN: ${{ github.token }}

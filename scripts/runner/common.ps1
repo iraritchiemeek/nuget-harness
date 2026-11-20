@@ -147,6 +147,13 @@ function Get-SnapshotAssetName([string]$Artifact, [string]$RunUrl) {
     return "$Artifact-$($Matches[1]).tar.gz"
 }
 
+# The GitHub Release that keeps a recording run's output, recordings-<run id>, from that run's URL.
+# Its one asset is <tag>.tar.gz: the recordings folder as the run committed it (record.yml, commit job).
+function Get-RecordingReleaseTag([string]$RunUrl) {
+    if ($RunUrl -notmatch '/actions/runs/(\d+)$') { throw "not a run URL: $RunUrl" }
+    return "recordings-$($Matches[1])"
+}
+
 # Write text as UTF-8 without a BOM and with LF line ends, so Windows PowerShell 5.1 and pwsh on
 # Linux produce the same bytes.
 function Write-Utf8File([string]$Path, [string[]]$Lines) {

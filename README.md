@@ -19,9 +19,9 @@ The flow:
 ```
 record.yml       old app on Windows, seed snapshot restored, every request in recordings/requests.txt sent twice
   record job       both passes byte-identical, in two data states -> artifact "recording" (+ state B snapshot)
-  commit job       artifact checked again -> recordings/ and recordings/manifest.json committed by the bot
+  commit job       artifact checked again -> release recordings-<run id>; recordings/ + manifest committed by the bot
 new-service.yml  on every push, on Linux, SQL Server in Docker restored from the snapshot
-  verify           recordings/ is byte for byte the artifact of the successful record.yml run the manifest names
+  verify           recordings/ is byte for byte the release asset of the successful record.yml run the manifest names
   capture          every recorded request sent to the new service
   compare          every record identical, or status-only / excluded as listed in recordings/parity-exclusions.txt
 live-parity.yml  old app and new service side by side on Windows, same requests plus new data and new requests
@@ -55,7 +55,7 @@ SEED_SNAPSHOT_DIR=$PWD/snapshot dotnet test --project test/GalleryReadService.In
 - `scripts/runner/`: the PowerShell harness. Most of it drives the old app on the Windows runner (build, setup, seed, snapshot, reset). The recording and comparison scripts (`capture.ps1`, `compare.ps1`, `verify-recordings.ps1`, `get-snapshot.ps1`, `secret-scan.ps1`, `common.ps1`) also run under PowerShell on Linux. The folder keeps its name because spec 01's evidence refers to it.
 - `scripts/linux/`: the Linux-only parts: SQL Server in Docker, the database fingerprint, the data change and the negative control.
 
-**Snapshots.** The database snapshots the checks restore are kept as assets of the [`snapshots-v1`](https://github.com/iraritchiemeek/nuget-harness/releases/tag/snapshots-v1) release, because workflow artifacts expire. `scripts/runner/get-snapshot.ps1` checks each one against the digest in `recordings/manifest.json` before anything restores it. The `recording` artifact that `verify-recordings.ps1` compares against does expire, after 90 days; after that the checks fail until the next recording run.
+**Snapshots.** The database snapshots the checks restore are kept as assets of the [`snapshots-v1`](https://github.com/iraritchiemeek/nuget-harness/releases/tag/snapshots-v1) release, because workflow artifacts expire. `scripts/runner/get-snapshot.ps1` checks each one against the digest in `recordings/manifest.json` before anything restores it. The recordings are kept the same way: each recording run's commit job attaches the folder it commits to a release named `recordings-<run id>`, and `verify-recordings.ps1` compares `recordings/` with that asset file by file, and checks that the run is a successful `record.yml` run on `main` while GitHub still has the run. A release asset can be replaced by anyone who can push, so it is weaker evidence than a run artifact; a run artifact expires after 90 days.
 
 ## License
 
