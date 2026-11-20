@@ -15,6 +15,10 @@ container=$(docker create "$image")
 docker export "$container" | tar -x -C "$work/image" 2>/dev/null || true
 docker rm "$container" >/dev/null
 
+# The ten largest JSON bodies: one line, starting with [.
+mapfile -t json_bodies < <(for f in "$recordings"/*/*.body; do
+  if [ "$(head -c1 "$f")" = '[' ] && [ "$(wc -l < "$f")" -eq 0 ]; then echo "$(stat -c%s "$f") $f"; fi
+done | sort -rn | head -10 | cut -d' ' -f2)
 find "$recordings" -type f -size +31c -exec sha256sum {} + | awk '{print $1}' | sort -u > "$work/recorded.sha"
 problems=0
 for dir in "$publish" "$work/image"; do
@@ -23,10 +27,10 @@ for dir in "$publish" "$work/image"; do
   find "$dir" -type f -exec sha256sum {} + 2>/dev/null | awk '{print $1}' | sort -u > "$work/built.sha"
   same=$(comm -12 "$work/recorded.sha" "$work/built.sha" | wc -l)
   if [ "$same" -ne 0 ]; then echo "$same recording files found by hash in $dir"; problems=1; fi
-  for body in $(grep -l '^\[' -r "$recordings" --include='*.body' | xargs ls -S | head -10); do
+  for body in "${json_bodies[@]}"; do
     if grep -rqF -f "$body" "$dir" 2>/dev/null; then echo "the text of $body is inside $dir"; problems=1; fi
   done
-  echo "checked $(find "$dir" -type f | wc -l) files in $dir"
+  echo "checked $(find "$dir" -type f | wc -l) files in $dir (names, hashes, and the text of ${#json_bodies[@]} JSON bodies)"
 done
 rm -rf "$work"
 exit $problems
