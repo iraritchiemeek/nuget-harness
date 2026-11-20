@@ -61,6 +61,21 @@ A benchmark job on `windows-2022` runs the old app and the new service side by s
 3. The benchmark has run at least three times and the report is published.
 4. `evidence/02b/run-log.md` covers every run, decision and finding.
 
+## Amendments
+
+**B1. Ties in the most-downloaded list are broken by registration order, not by ID.**
+- **The problem:** in both recorded data states every download count is 0. The old app's answer is the first 30 of a 148-way tie.
+  - Breaking ties by ID picks a *different* 30 IDs, not the same 30 in a new order. An approved difference may only reorder, so it can't be stated that way (probe run 44686598178: the 9 failures are exactly the blank-`partialId` requests).
+- **The fix:** break ties by registration key, oldest registration first.
+  - The order is now defined and guaranteed, which fixes the bug (bug 2).
+  - It also reproduces every recorded answer byte for byte, so no approved-difference rule is needed.
+  - The service code and the run log say plainly that this order was chosen because it is deterministic and also matches what the old app's query plan happened to return.
+
+**B2. The benchmark must compare like with like.**
+- **Transport:** both apps are measured over HTTPS. The old app requires TLS, so the new service runs on Kestrel with a certificate for the same host.
+- **Logging:** both log at the same level during measurement.
+- **Anything else that can't be equalised** is listed in `benchmark.md` as a caveat, next to the numbers it affects.
+
 ## Out of scope
 
 - the front proxy (next spec)
