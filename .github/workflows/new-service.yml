@@ -10,71 +10,80 @@ on:
 
 permissions:
   contents: read
-  actions: read # download seed-snapshot from the old-app run that made it
+  actions: read # download the snapshots from the runs that made them
 
 env:
-  # The old-app run whose seed-snapshot artifact every spec 02 job restores.
+  # The old-app run whose seed-snapshot artifact (state A) every spec 02 job restores. The state B
+  # snapshot belongs to the recording run named in recordings/manifest.json.
   SNAPSHOT_RUN_ID: '44653627352'
   DOTNET_NOLOGO: 'true'
   DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
 
 jobs:
-  # Done-when 3: restore the snapshot into SQL Server, start the service, send every recorded
-  # request, and require every record to match.
+  # Done-when 3 and 7, in both data states (amendment A2): restore the state's snapshot into SQL
+  # Server, start the service as the read-only login, send every recorded request, and require
+  # every record to match. The database fingerprint before and after must be identical.
   recordings:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        state: [a, b]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0 # verify-recordings.ps1 reads who last committed recordings/
 
-      - name: Download seed-snapshot
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - name: Which snapshot
+        run: |
+          if [ "${{ matrix.state }}" = a ]; then
+            echo "ARTIFACT=seed-snapshot" >> "$GITHUB_ENV"
+            echo "RUN_ID=$SNAPSHOT_RUN_ID" >> "$GITHUB_ENV"
+          else
+            echo "ARTIFACT=state-b-snapshot" >> "$GITHUB_ENV"
+            echo "RUN_ID=$(jq -r .stateBSnapshotRun recordings/manifest.json | sed 's#.*/##')" >> "$GITHUB_ENV"
+          fi
+
+      - name: Database and service
+        uses: ./.github/actions/service-under-test
         with:
-          name: seed-snapshot
-          path: ${{ runner.temp }}/snapshot
-          run-id: ${{ env.SNAPSHOT_RUN_ID }}
-          github-token: ${{ github.token }}
+          snapshot-artifact: ${{ env.ARTIFACT }}
+          snapshot-run-id: ${{ env.RUN_ID }}
 
       - name: Verify the recordings against their manifest
         shell: pwsh
-        run: ./scripts/runner/verify-recordings.ps1 -Snapshot "$env:RUNNER_TEMP/snapshot"
-
-      - name: Generate the SQL passwords
         run: |
-          for name in SA_PASSWORD READER_PASSWORD; do
-            pw="Pw1-$(openssl rand -hex 16)"
-            echo "::add-mask::$pw"
-            echo "$name=$pw" >> "$GITHUB_ENV"
-          done
+          $snap = if ('${{ matrix.state }}' -eq 'a') { @{ Snapshot = "$env:RUNNER_TEMP/snapshot" } } else { @{ StateBSnapshot = "$env:RUNNER_TEMP/snapshot" } }
+          ./scripts/runner/verify-recordings.ps1 @snap
 
-      - name: Start SQL Server and restore the snapshot
-        run: scripts/linux/sql-server.sh "$RUNNER_TEMP/snapshot"
-
-      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
-        with:
-          global-json-file: service/global.json
-
-      - name: Build the service
-        run: dotnet publish service/src/GalleryReadService -c Release -o "$RUNNER_TEMP/publish"
-
-      - name: Start the service as the read-only login
+      - name: Send every recorded request, fingerprinting the database before and after
+        shell: pwsh
         run: |
-          export Database__ConnectionString="Server=localhost,1433;Database=NuGetGallery;User Id=reader;Password=$READER_PASSWORD;TrustServerCertificate=True"
-          export ASPNETCORE_URLS=http://localhost:5080
-          nohup dotnet "$RUNNER_TEMP/publish/GalleryReadService.dll" > "$RUNNER_TEMP/service.log" 2>&1 &
-          for _ in $(seq 1 30); do
-            if curl -sf http://localhost:5080/health > /dev/null; then echo 'service healthy'; exit 0; fi
-            sleep 1
-          done
-          cat "$RUNNER_TEMP/service.log"; exit 1
+          New-Item -ItemType Directory -Force out | Out-Null
+          bash scripts/linux/db-fingerprint.sh > out/db-before.txt
+          ./scripts/runner/capture.ps1 -Requests recordings/requests.txt -Dir out/new-service -Server http://localhost:5080
+          bash scripts/linux/db-fingerprint.sh > out/db-after.txt
+
+      - name: Check 7 (the service wrote nothing)
+        shell: pwsh
+        run: |
+          . ./scripts/runner/common.ps1
+          $before = Get-Content out/db-before.txt; $after = Get-Content out/db-after.txt
+          $diff = @(Compare-Object $before $after -CaseSensitive)
+          $diff | Format-Table -AutoSize | Out-String | Write-Host
+          $ok = $before.Count -gt 0 -and $diff.Count -eq 0
+          $detail = "state ${{ matrix.state }}: $($before.Count) fingerprint lines (row count and checksum of every table, SHA-256 of Packages and PackageRegistrations) identical before and after $(@(Get-Content out/new-service/_index.tsv).Count) requests"
+          Write-Result 7 'the service wrote nothing' $ok $detail
+          Write-Summary "- check 7: $(if ($ok) {'pass'} else {'FAIL'}) - $detail"
+          if (-not $ok) { throw 'the database changed while the requests were sent' }
 
       - name: Check 3 (every recorded request matches)
         shell: pwsh
-        run: |
-          ./scripts/runner/capture.ps1 -Requests recordings/requests.txt -Dir out/new-service -Server http://localhost:5080
-          ./scripts/runner/compare.ps1 -Before recordings/responses -After out/new-service -CheckNumber 3 -Name 'new service matches the recordings' -OutName check3-recordings.txt
+        run: >-
+          ./scripts/runner/compare.ps1 -Before recordings/state-${{ matrix.state }} -After out/new-service
+          -Exclusions recordings/parity-exclusions.txt -CheckNumber 3
+          -Name 'state ${{ matrix.state }}: new service matches the recordings' -OutName check3-state-${{ matrix.state }}.txt
 
       - name: Service log
         if: always()
@@ -84,6 +93,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: new-service-recordings
+          name: new-service-state-${{ matrix.state }}
           path: out/
           if-no-files-found: warn

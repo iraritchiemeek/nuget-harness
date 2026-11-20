@@ -4,7 +4,8 @@
 # The restored snapshot holds no usable credential: the seed account's password and API key lived
 # only in the seeding run's RUNNER_TEMP. So a second account is made through the site's forms
 # (new-account.ps1). The gallery accepts a new version only from an owner of the ID, and an
-# ownership request needs the current owner to accept it by signing in. The one step that does not
+# ownership request needs the current owner to accept it by signing in (exploratory record run
+# 44665262875: the first push, made before the grant, was answered 403). The one step that does not
 # go through the app is therefore a SQL row: the new account is made a co-owner of the IDs it pushes
 # (PackageRegistrationOwners). It touches no package row, and every package row comes from a push.
 param([string]$List = (Join-Path $PSScriptRoot '..\..\seed\state-b.txt'))
@@ -17,9 +18,6 @@ $entries = @(Get-Content $List | ForEach-Object { $_.Trim() } | Where-Object { $
 & "$PSScriptRoot\new-account.ps1" -Username 'stateb' -Email 'stateb@example.com'
 $apiKey = Get-Content $ApiKeyFile -Raw
 
-# EXPLORE: push before the grant
-$probe = Publish-Package -File (Get-SeedPackage -Id $entries[0].Id -Version $entries[0].Version -CacheDir $env:RUNNER_TEMP) -ApiKey $apiKey -ResponseFile (Join-Path $OutDir 'probe.txt')
-Write-Summary "- EXPLORE: push of $($entries[0].Id) before the ownership grant -> $probe"
 $ids = (@($entries | ForEach-Object { "N'$($_.Id)'" } | Sort-Object -Unique)) -join ', '
 $granted = Invoke-Sql -Database 'NuGetGallery' -Query @"
 INSERT INTO [dbo].[PackageRegistrationOwners] ([PackageRegistrationKey], [UserKey])

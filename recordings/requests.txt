@@ -14,6 +14,8 @@
 # Not sent, on purpose:
 # - path characters in requestPathInvalidCharacters (< > * % : \ ?) and encoded slashes. ASP.NET and IIS reject them
 #   before the app runs, and answer local clients with a detailed error page that includes the server's file paths.
+# - + in a path segment, such as /api/v2/package-versions/Serilog+Sinks. IIS request filtering rejects it before the
+#   app runs (404.11, double escaping; seen in exploratory record run 44665262875), with the same kind of page.
 # - a path that matches neither route, such as /api/v2/package-versions/Serilog/extra. It never reaches these two
 #   endpoints, so it is not the new service's to answer; the proxy in the next spec sends it to the old app.
 
@@ -304,6 +306,8 @@ PUT /api/v2/package-versions/Serilog
 # Blank and whitespace IDs and prefixes (spec 02 amendment A3). Source: AutocompleteDatabasePackageVersionsQuery.cs
 # (string.IsNullOrWhiteSpace(id) throws ArgumentNullException), AutocompleteDatabasePackageIdsQuery.cs (a blank
 # partialId asks for the most-downloaded IDs). An empty {id} segment matches no route (Routes.cs), so it is not sent.
+# Recorded behaviour (exploratory run 44665262875): IIS trims trailing spaces from the path, so an all-blank id never
+# reaches the app. IIS answers 404.4 with its detailed error page, which names the runner's physical path.
 GET /api/v2/package-versions/%20
 GET /api/v2/package-versions/%20%20
 GET /api/v2/package-versions/%20Serilog
@@ -344,4 +348,3 @@ GET /api/v2/package-versions/Ninject?includePrerelease=true&semVerLevel=2.0.0
 GET /api/v2/package-ids?partialId=Ninject&includePrerelease=true&semVerLevel=2.0.0
 GET /api/v2/package-ids?partialId=xunit&includePrerelease=true&semVerLevel=2.0.0
 GET /api/v2/package-ids?partialId=Serilog.Exceptions&semVerLevel=2.0.0
-GET /api/v2/package-versions/Serilog+Sinks

@@ -6,6 +6,8 @@ param([Parameter(Mandatory)] [string]$StateA, [Parameter(Mandatory)] [string]$St
       [Parameter(Mandatory)] [string]$Snapshot, [Parameter(Mandatory)] [string]$StateBSnapshot)
 . "$PSScriptRoot\common.ps1"
 $rec = Join-Path $RepoRoot 'recordings'
+# The single-state layout from before amendment A2.
+Remove-Item (Join-Path $rec 'responses') -Recurse -Force -ErrorAction SilentlyContinue
 foreach ($state in @(@{ Name = 'state-a'; From = $StateA }, @{ Name = 'state-b'; From = $StateB })) {
     $to = Join-Path $rec $state.Name
     if (Test-Path $to) { Remove-Item $to -Recurse -Force }

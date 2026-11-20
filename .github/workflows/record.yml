@@ -90,18 +90,6 @@ jobs:
           .\scripts\runner\capture.ps1 -Requests recordings\requests.txt -Dir out\state-b\pass2
           .\scripts\runner\compare.ps1 -Before out\state-b\pass1 -After out\state-b\pass2 -CheckNumber 1 -Name 'state B: two recording passes are byte-identical' -OutName record-passes-b.txt
 
-      - name: EXPLORE LocalDB SQL login
-        continue-on-error: true
-        run: |
-          . .\scripts\runner\common.ps1
-          $pw = 'Pw1-' + [guid]::NewGuid().ToString('N')
-          Write-Host "::add-mask::$pw"
-          Invoke-Sql "CREATE LOGIN [reader] WITH PASSWORD = N'$pw', CHECK_POLICY = OFF" | Out-Null
-          Invoke-Sql -Database NuGetGallery "CREATE USER [reader] FOR LOGIN [reader]; ALTER ROLE [db_datareader] ADD MEMBER [reader];" | Out-Null
-          Invoke-Sql "SELECT SERVERPROPERTY('IsIntegratedSecurityOnly') AS i" | ForEach-Object { Write-Host "IsIntegratedSecurityOnly=$($_.i)" }
-          $c = New-Object System.Data.SqlClient.SqlConnection "Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=NuGetGallery;User Id=reader;Password=$pw;Pooling=False"
-          $c.Open(); $cmd = $c.CreateCommand(); $cmd.CommandText = 'SELECT COUNT(*) FROM dbo.Packages'; Write-Host "reader sees $($cmd.ExecuteScalar()) packages"; $c.Close()
-
       - name: Save the SQL the old app sent (from the plan cache)
         run: .\scripts\runner\dump-sql.ps1 -OutFile out\old-app-sql.txt
 

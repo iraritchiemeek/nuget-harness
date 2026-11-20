@@ -1,0 +1,58 @@
+name: service-under-test
+description: >
+  On ubuntu-24.04: download a gallery database snapshot, restore it into SQL Server in Docker,
+  publish the new service and start it on http://localhost:5080 as the read-only login `reader`.
+  Leaves SA_PASSWORD and READER_PASSWORD (generated here, masked) in the job environment, and the
+  service log at $RUNNER_TEMP/service.log. The caller checks out this repository first.
+
+inputs:
+  snapshot-artifact:
+    description: seed-snapshot (state A) or state-b-snapshot (state B)
+    required: true
+  snapshot-run-id:
+    description: The run that made the snapshot artifact
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Download ${{ inputs.snapshot-artifact }}
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      with:
+        name: ${{ inputs.snapshot-artifact }}
+        path: ${{ runner.temp }}/snapshot
+        run-id: ${{ inputs.snapshot-run-id }}
+        github-token: ${{ github.token }}
+
+    - name: Generate the SQL passwords
+      shell: bash
+      run: |
+        for name in SA_PASSWORD READER_PASSWORD; do
+          pw="Pw1-$(openssl rand -hex 16)"
+          echo "::add-mask::$pw"
+          echo "$name=$pw" >> "$GITHUB_ENV"
+        done
+
+    - name: Start SQL Server and restore the snapshot
+      shell: bash
+      run: scripts/linux/sql-server.sh "$RUNNER_TEMP/snapshot"
+
+    - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+      with:
+        global-json-file: service/global.json
+
+    - name: Publish the service
+      shell: bash
+      run: dotnet publish service/src/GalleryReadService -c Release -o "$RUNNER_TEMP/publish"
+
+    - name: Start the service as the read-only login
+      shell: bash
+      run: |
+        export Database__ConnectionString="Server=localhost,1433;Database=NuGetGallery;User Id=reader;Password=$READER_PASSWORD;TrustServerCertificate=True"
+        export ASPNETCORE_URLS=http://localhost:5080
+        nohup dotnet "$RUNNER_TEMP/publish/GalleryReadService.dll" > "$RUNNER_TEMP/service.log" 2>&1 &
+        for _ in $(seq 1 30); do
+          if curl -sf http://localhost:5080/health > /dev/null; then echo 'service healthy'; exit 0; fi
+          sleep 1
+        done
+        cat "$RUNNER_TEMP/service.log"; exit 1
