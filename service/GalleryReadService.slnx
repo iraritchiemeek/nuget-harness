@@ -2,4 +2,8 @@
   <Folder Name="/src/">
     <Project Path="src/GalleryReadService/GalleryReadService.csproj" />
   </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/GalleryReadService.IntegrationTests/GalleryReadService.IntegrationTests.csproj" />
+    <Project Path="test/GalleryReadService.Tests/GalleryReadService.Tests.csproj" />
+  </Folder>
 </Solution>

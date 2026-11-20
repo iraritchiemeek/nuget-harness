@@ -31,3 +31,6 @@ dotnet_diagnostic.MA0004.severity = none # Same rule as CA2007, from Meziantou.A
 [test/**.cs]
 # xUnit test method names describe behaviour with underscores (docs/engineering-standards.md, Tests).
 dotnet_diagnostic.CA1707.severity = none
+# Test classes and methods are public for xUnit, and their names describe the behaviour, so XML
+# documentation comments would only repeat them.
+dotnet_diagnostic.CS1591.severity = none

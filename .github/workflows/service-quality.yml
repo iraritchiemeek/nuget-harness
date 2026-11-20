@@ -1,0 +1,117 @@
+name: service-quality
+
+# Spec 02 done-when 8: every gate in docs/engineering-standards.md that a tool can enforce, on
+# every push. Each step fails the build. CodeQL is in codeql.yml.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'specs/**']
+
+permissions:
+  contents: read
+  actions: read # download seed-snapshot for the integration tests
+
+env:
+  SNAPSHOT_RUN_ID: '44653627352'
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+defaults:
+  run:
+    working-directory: service
+
+jobs:
+  # Locked restore with NuGet audit, build with analyzers and warnings as errors, formatting,
+  # unit and property tests, and integration tests against SQL Server restored from the seed snapshot.
+  gates:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          global-json-file: service/global.json
+
+      - name: Restore in locked mode (lock files must match), with NuGet audit
+        run: dotnet restore --locked-mode -warnaserror
+
+      - name: No known-vulnerable package, transitive ones included
+        run: |
+          dotnet package list --vulnerable --include-transitive --format json > "$RUNNER_TEMP/vulnerable.json"
+          count=$(jq '[.projects[].frameworks[]? | (.topLevelPackages // []) + (.transitivePackages // []) | .[]] | length' "$RUNNER_TEMP/vulnerable.json")
+          echo "vulnerable packages: $count"
+          test "$count" -eq 0
+
+      - name: Build (analyzers, code style, warnings as errors)
+        run: dotnet build --no-restore -c Release
+
+      - name: CSharpier
+        run: |
+          dotnet tool restore
+          dotnet csharpier check .
+
+      - name: dotnet format (style and analyzers; CSharpier owns whitespace)
+        run: |
+          dotnet format style --verify-no-changes --no-restore
+          dotnet format analyzers --verify-no-changes --no-restore
+
+      - name: Unit and property tests
+        run: dotnet test --no-build -c Release --project test/GalleryReadService.Tests
+
+      - name: Download seed-snapshot
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: seed-snapshot
+          path: ${{ runner.temp }}/snapshot
+          run-id: ${{ env.SNAPSHOT_RUN_ID }}
+          github-token: ${{ github.token }}
+
+      - name: Integration tests (Testcontainers SQL Server, restored from the seed snapshot)
+        env:
+          SEED_SNAPSHOT_DIR: ${{ runner.temp }}/snapshot
+        run: dotnet test --no-build -c Release --project test/GalleryReadService.IntegrationTests
+
+  # Mutation testing of the whole service with both test projects. Fails below a score of 80
+  # (src/GalleryReadService/stryker-config.json). The report is uploaded with every run.
+  mutation-testing:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          global-json-file: service/global.json
+
+      - name: Download seed-snapshot
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: seed-snapshot
+          path: ${{ runner.temp }}/snapshot
+          run-id: ${{ env.SNAPSHOT_RUN_ID }}
+          github-token: ${{ github.token }}
+
+      - name: Stryker.NET (break threshold 80)
+        working-directory: service/src/GalleryReadService
+        env:
+          SEED_SNAPSHOT_DIR: ${{ runner.temp }}/snapshot
+        run: |
+          dotnet tool restore
+          dotnet stryker --output "$RUNNER_TEMP/stryker"
+
+      - name: Mutation score and surviving mutants
+        if: always()
+        working-directory: service
+        run: |
+          report=$(find "$RUNNER_TEMP/stryker" -name mutation-report.md | head -1)
+          if [ -n "$report" ]; then cat "$report" >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: stryker-report
+          path: ${{ runner.temp }}/stryker
+          if-no-files-found: warn

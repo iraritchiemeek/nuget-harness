@@ -1,10 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
-    <!-- Container: built with dotnet publish /t:PublishContainer, on a chiseled, non-root image.
-         The -extra flavour carries ICU, which Microsoft.Data.SqlClient needs: it refuses to run
-         in globalization-invariant mode. -->
+    <!-- Container: built with dotnet publish /t:PublishContainer, on a chiseled, non-root image,
+         pinned by digest (the 10.0-noble-chiseled-extra manifest list). The -extra flavour carries
+         ICU, which Microsoft.Data.SqlClient needs: it refuses to run in globalization-invariant mode. -->
     <ContainerRepository>gallery-read-service</ContainerRepository>
-    <ContainerFamily>noble-chiseled-extra</ContainerFamily>
+    <ContainerBaseImage>mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra@sha256:cae5b962bfb786606def03d250c6a645cc98839095c89e806e4bd8978a68115b</ContainerBaseImage>
   </PropertyGroup>
 
   <ItemGroup>

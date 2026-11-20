@@ -7,3 +7,4 @@ out/
 gallery/
 bin/
 obj/
+StrykerOutput/
