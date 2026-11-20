@@ -107,7 +107,8 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A recordings/responses recordings/state-a recordings/state-b recordings/manifest.json
+          git add -A recordings/state-a recordings/state-b recordings/manifest.json
+          if ($LASTEXITCODE -ne 0) { throw 'git add failed' }
           git diff --cached --quiet
           if ($LASTEXITCODE -eq 0) { Write-Host 'recording unchanged; nothing to commit'; exit 0 }
           git commit -q -m "Record the old app's responses (run $env:GITHUB_RUN_ID)" -m "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
