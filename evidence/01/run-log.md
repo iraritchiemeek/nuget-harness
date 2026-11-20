@@ -62,6 +62,10 @@ Everything below ran in the public workflow `.github/workflows/old-app.yml` (job
 | [9](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44650025717) | fail | 3:29 | All 420 pushed in about 1 minute. `check.ps1` failed with `The property 'Count' cannot be found on this object`: PowerShell unrolled a one-element JSON array into a scalar under strict mode. | Wrap the parsed responses in `@()`. |
 | [10](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44650564188) | fail | 3:00 | Checks 1 to 3 all passed. The snapshot step exited 1 only because robocopy returns 1 when it copies files successfully. | Reset `$LASTEXITCODE` after the robocopy success check. |
 | [11](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44651015255) | **pass** | 3:28 | All seven done-when checks pass. | |
+| [12](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44651621814) | **pass** | 3:28 | Repeat green run. | Added a secret scan before every upload, a second job that restores the snapshot on a fresh machine, and a `workflow_dispatch` input `skip_build_cache`. |
+| [13](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44652403140) | fail | 3:09 | Both secret scans passed (1059 and 1615 files). `compare.ps1` then failed: its new `[int]$N` parameter collided with the `$n` loop variable, because PowerShell variable names are case-insensitive. | Rename the parameter to `-CheckNumber`. |
+| [14](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44652847163) | **pass** | 5:52 | `old-app` job: 3:39, build cache hit, all seven checks pass. `restore-on-fresh-machine` job: 2:10. It downloaded `seed-snapshot` onto a second runner, ran setup and `reset.ps1`, and got 180 of 180 responses byte-identical to the first job's post-seed responses. Checks 1 to 3 also pass on the restored state. | |
+| [15](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44653627352) | **pass** | 9:46 | Manual `workflow_dispatch` with `skip_build_cache=true`, so the app was built from source. `build.ps1` took 3:47 and the `old-app` job 7:24. All seven checks pass, and the fresh-machine restore passes too. This is the from-nothing green run. | |
 
 ### Done-when results (run 11)
 
@@ -77,7 +81,7 @@ Everything below ran in the public workflow `.github/workflows/old-app.yml` (job
 
 Artifacts in each green run:
 - `check-outputs`: check files, the raw responses, `seed/expected.json`, `seed/push-results.tsv`, and IIS Express and LocalDB diagnostics.
-- `seed-snapshot`: `NuGetGallery.bak`, `SupportRequest.bak`, the `Files/` package store and `expected.json`. `reset.ps1 -Dir <unzipped artifact>` restores it. In run 11 it was only exercised in the same job, onto the existing databases. A second job that restores it on a fresh machine was added afterwards (see below).
+- `seed-snapshot`: `NuGetGallery.bak`, `SupportRequest.bak`, the `Files/` package store and `expected.json`. `reset.ps1 -Dir <unzipped artifact>` restores it. In run 11 it was only exercised in the same job, onto the existing databases. A second job that restores it on a fresh machine was added afterwards, and it passed in runs 14 and 15.
 - The `Files/` store also holds the gallery's own `auditing/` records. These include the hosted runner's VM name, `runneradmin`, and a link-local IPv6 address. Those are ephemeral runner details, not personal ones. Credential `Value` fields in the audit records are null.
 
 ### Config changes
@@ -98,10 +102,11 @@ None. The app runs on its shipped `Web.config`, `flags.json` and `global.json`. 
 ### Loop length and caching
 
 - **Build-output cache.** `src/NuGetGallery` (without `obj`) plus the EntityFramework NuGet package are saved right after a build. The cache key is the pinned SHA plus the runner image version. On a hit, `build.ps1` is skipped.
-- **Build cost.** A build costs 3:28 (run 7) to 4:24 (run 8). Restoring the cache takes about 2 s.
+- **Build cost.** A build costs 3:28 to 4:24 (runs 7, 8 and 15). Restoring the cache takes about 2 s, so a hit saves about 3.5 to 4.5 minutes per run.
 - **Full run times.**
   - Green run with both caches hit (run 11): 3:28.
-  - Full run with a cold build cache: about 7 to 8 minutes.
+  - Same, plus the fresh-machine restore job (run 14): 5:52.
+  - Cold build from source (run 15): `old-app` job 7:24, whole run including the restore job 9:46.
 - **Remaining steps** on a warm run:
   - setup: about 55 s
   - first response: about 27 s
@@ -110,4 +115,6 @@ None. The app runs on its shipped `Web.config`, `flags.json` and `global.json`. 
 - **Runner images are mixed during a rollout.** Two image versions (`20261112.366.7`, `20261116.370.1`) appeared within an hour, so the image-keyed cache misses on whichever image a run lands on first.
 - **Seed packages** are cached separately, keyed on the hash of `seed/packages.txt`, and saved right after a successful seed.
 
-Runs used in this session: 11 (10 failed while iterating, 1 green).
+Runs used in this session: 15. Eleven failed while iterating, and four were green (11, 12, 14, 15).
+
+Latest green run: https://github.com/iraritchiemeek/nuget-harness/actions/runs/44653627352 (cold build, both jobs).
