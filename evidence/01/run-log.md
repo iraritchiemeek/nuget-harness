@@ -77,23 +77,23 @@ Everything below ran in the public workflow `.github/workflows/old-app.yml` (job
 
 Artifacts in each green run:
 - `check-outputs`: check files, the raw responses, `seed/expected.json`, `seed/push-results.tsv`, and IIS Express and LocalDB diagnostics.
-- `seed-snapshot`: `NuGetGallery.bak`, `SupportRequest.bak`, the `Files/` package store and `expected.json`. `reset.ps1 -Dir <unzipped artifact>` restores it, including on a fresh machine (it uses `RESTORE ... WITH MOVE`).
+- `seed-snapshot`: `NuGetGallery.bak`, `SupportRequest.bak`, the `Files/` package store and `expected.json`. `reset.ps1 -Dir <unzipped artifact>` restores it. In run 11 it was only exercised in the same job, onto the existing databases. A second job that restores it on a fresh machine was added afterwards (see below).
+- The `Files/` store also holds the gallery's own `auditing/` records. These include the hosted runner's VM name, `runneradmin`, and a link-local IPv6 address. Those are ephemeral runner details, not personal ones. Credential `Value` fields in the audit records are null.
 
 ### Config changes
 
-None. The app runs on its shipped `Web.config`, `flags.json` and `global.json`. Three behaviours were met by choosing request values or runner state instead of editing config:
-- parking newer .NET SDKs
+None. The app runs on its shipped `Web.config`, `flags.json` and `global.json`. Three behaviours were met by choosing request values or runner state instead of editing config. All three are listed in `evidence/01/config.diff` as notes with no diff hunks:
+- parking newer .NET SDKs. As a result, the build uses SDK 9.0.321 rather than the 8.0.3xx the spec assumed, because SDK 8 cannot read the repo's `.slnx`.
 - `forceApiKeys=true`
 - the 8-day key
-
-These are listed in `evidence/01/config.diff` as runner-side notes.
 
 ### Secrets and public data
 
 - The account password and the API key are generated inside the run and masked with `::add-mask::`.
 - The cookie jar, form bodies and responses are kept in `$RUNNER_TEMP`, which is never uploaded.
 - The account email is the placeholder `seeduser@example.com`.
-- The public `seed-snapshot` artifact contains that account and the hashes of its password and API key. The key itself expires 8 days after creation.
+- The public `seed-snapshot` artifact contains that account and the gallery's stored forms of its password and API key. The key expires 8 days after creation.
+- From run 12 on, `secret-scan.ps1` checks every file before each upload. It searches for the raw password and API key, as ASCII and as UTF-16LE (nvarchar), and fails the run on any hit.
 
 ### Loop length and caching
 

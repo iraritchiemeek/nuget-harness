@@ -6,6 +6,11 @@ name: old-app
 
 on:
   workflow_dispatch:
+    inputs:
+      skip_build_cache:
+        description: Ignore the cached gallery build and run build.ps1 from source
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths-ignore: ['**.md', 'specs/**']
@@ -50,6 +55,7 @@ jobs:
 
       - name: Restore cached gallery build output
         id: buildcache
+        if: ${{ !inputs.skip_build_cache }}
         uses: actions/cache/restore@v4
         with:
           path: |
@@ -70,7 +76,7 @@ jobs:
             gallery/src/NuGetGallery
             !gallery/src/NuGetGallery/obj
             ~/.nuget/packages/entityframework
-          key: ${{ steps.buildcache.outputs.cache-primary-key }}
+          key: gallery-build-v2-${{ env.GALLERY_SHA }}-${{ steps.image.outputs.key }}
 
       - name: Record build source
         run: |
@@ -103,6 +109,9 @@ jobs:
       - name: Snapshot (database backups + package store)
         run: .\scripts\runner\snapshot.ps1 -Dir out\snapshot
 
+      - name: Secret scan of the snapshot
+        run: .\scripts\runner\secret-scan.ps1 -Dir out\snapshot
+
       - name: Upload snapshot
         uses: actions/upload-artifact@v4
         with:
@@ -134,6 +143,10 @@ jobs:
         if: always()
         run: .\scripts\runner\stop-site.ps1
 
+      - name: Secret scan of the check outputs
+        if: always()
+        run: .\scripts\runner\secret-scan.ps1 -Dir out
+
       - name: Upload check outputs
         if: always()
         uses: actions/upload-artifact@v4
@@ -142,4 +155,83 @@ jobs:
           path: |
             out/
             !out/snapshot/
+          if-no-files-found: warn
+
+  # Prove the snapshot artifact restores onto a different, fresh machine: no seeding, just
+  # setup, reset.ps1 from the downloaded artifact, then the same requests and checks.
+  restore-on-fresh-machine:
+    needs: old-app
+    runs-on: windows-2022
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out NuGetGallery at the pinned commit
+        uses: actions/checkout@v4
+        with:
+          repository: NuGet/NuGetGallery
+          ref: ${{ env.GALLERY_SHA }}
+          path: gallery
+          fetch-depth: 1
+
+      - name: Park .NET SDKs newer than 9 (runner change, not app change)
+        run: .\scripts\runner\pin-dotnet-sdk.ps1
+
+      - name: Read runner image version
+        id: image
+        run: Add-Content $env:GITHUB_OUTPUT "key=$env:ImageOS-$env:ImageVersion"
+
+      - name: Restore cached gallery build output
+        id: buildcache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            gallery/src/NuGetGallery
+            !gallery/src/NuGetGallery/obj
+            ~/.nuget/packages/entityframework
+          key: gallery-build-v2-${{ env.GALLERY_SHA }}-${{ steps.image.outputs.key }}
+
+      - name: Build (only on a cache miss)
+        if: steps.buildcache.outputs.cache-hit != 'true'
+        run: .\scripts\runner\build.ps1
+
+      - name: Setup (gallery tools\Setup-DevEnvironment.ps1)
+        run: .\scripts\runner\setup.ps1
+
+      - name: Download the seed snapshot from the first job
+        uses: actions/download-artifact@v4
+        with:
+          name: seed-snapshot
+          path: snapshot
+
+      - name: Download the first job's responses
+        uses: actions/download-artifact@v4
+        with:
+          name: check-outputs
+          path: first-job
+
+      - name: Reset from the snapshot, then compare and check
+        run: |
+          .\scripts\runner\reset.ps1 -Dir snapshot
+          .\scripts\runner\capture.ps1 -Dir out\responses\restored
+          .\scripts\runner\compare.ps1 -Before first-job\responses\seeded -After out\responses\restored -N 5 -Name 'snapshot restores byte-identically on a fresh machine' -OutName check5-fresh-machine.txt
+          .\scripts\runner\check.ps1 -Dir out\responses\restored
+
+      - name: Diagnostics
+        if: always()
+        run: .\scripts\runner\diagnostics.ps1
+
+      - name: Stop IIS Express
+        if: always()
+        run: .\scripts\runner\stop-site.ps1
+
+      - name: Upload outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fresh-machine-restore-outputs
+          path: out/
           if-no-files-found: warn

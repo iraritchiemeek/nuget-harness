@@ -68,6 +68,8 @@ $username = 'seeduser'
 $email = 'seeduser@example.com'   # placeholder, not a real mailbox; the DB backup artifact is public
 $password = New-Secret 24
 Write-Host "::add-mask::$password"
+# Kept in RUNNER_TEMP (never uploaded) only so secret-scan.ps1 can prove it is not in any artifact.
+Set-Content -Path (Join-Path $env:RUNNER_TEMP 'password.txt') -Value $password -NoNewline
 
 $page = Join-Path $secretDir 'signup.html'
 $code = Get-Page '/users/account/SignUp' $page

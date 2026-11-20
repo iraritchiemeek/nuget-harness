@@ -4,7 +4,14 @@
 #
 # None. The app runs on its shipped Web.config and global.json.
 #
-# Runner-side adjustments (not app config, recorded here for completeness):
-# - .NET SDKs with major version above 9 are moved out of C:\Program Files\dotnet\sdk for the run
-#   (scripts/runner/pin-dotnet-sdk.ps1). The gallery's global.json rolls forward to the newest SDK,
-#   and on windows-2022 that SDK needs MSBuild 18.7 while VS 2022 has MSBuild 17.14.
+# Things met without editing config (not app config changes, recorded here for completeness):
+# - Runner: .NET SDKs with major version above 9 are moved out of C:\Program Files\dotnet\sdk for the
+#   run (scripts/runner/pin-dotnet-sdk.ps1). The gallery's global.json rolls forward to the newest SDK,
+#   and on windows-2022 that SDK (11.0.100) needs MSBuild 18.7 while VS 2022 has MSBuild 17.14. SDK 9
+#   stays because build\common.ps1 reads the .slnx with `dotnet sln list`, which SDK 8 cannot.
+#   The gallery folder then resolves SDK 9.0.321, not the 8.0.3xx the spec expected.
+# - Request: the seed script opens /account/apikeys?forceApiKeys=true. Without it the page redirects
+#   every user to Trusted Publishing; the Trusted Publishing page's own "API keys" link adds it.
+# - Request: the API key is created with an 8-day expiry (one of the form's choices). The shipped
+#   flags.json enables NuGetGallery.ApiKeyReduction, which treats keys lasting over 30 days as expiring
+#   on 2026-11-01, so a 365-day key would be expired on creation.
