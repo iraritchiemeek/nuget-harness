@@ -122,7 +122,7 @@ function Invoke-K6([string]$BaseUrl, [int]$Vus, [string]$Length, [string]$Summar
 # The HTTP and TLS versions of a k6 run's requests, from the per-protocol counts load.js asks for.
 function Get-Protocol($Metrics) {
     $seen = @($Metrics.PSObject.Properties | Where-Object { $_.Name -match '^http_reqs\{(proto|tls_version):' -and $_.Value.values.count -gt 0 } |
-        ForEach-Object { "$($_.Name -replace '^http_reqs\{\w+:(.*)\}$', '$1') ($($_.Value.values.count))" })
+        ForEach-Object { "$($_.Name -replace '^http_reqs\{\w+:(.*)\}$', '$1') ($($_.Value.values.count))" } | Sort-Object)
     return $seen -join ', '
 }
 
