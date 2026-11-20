@@ -27,9 +27,9 @@
       },
       "NuGet.Versioning": {
         "type": "Direct",
-        "requested": "[6.13.2, )",
-        "resolved": "6.13.2",
-        "contentHash": "pGYNyvCVM+Z9jITTiJiuxFC8oJXFdh2k25ZDV4tSAOSuKyAWvh1VcfJy0WZGWdI6J7Avkbl0qra7XENYFSy4Ng=="
+        "requested": "[8.0.0, )",
+        "resolved": "8.0.0",
+        "contentHash": "BvQniE/cRs8wpEhR3iVWMab3LUgz7QStiVVzlOairH1a7VtqA8Wwsbf4HarVYq6gjoZ2max1U4XeaG/IAdAWIw=="
       },
       "Microsoft.Bcl.Cryptography": {
         "type": "Transitive",
