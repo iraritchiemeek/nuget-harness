@@ -4,3 +4,5 @@
 *.pfx
 *.key
 secrets/
+out/
+gallery/

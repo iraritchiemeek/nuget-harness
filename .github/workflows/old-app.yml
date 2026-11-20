@@ -1,0 +1,51 @@
+name: old-app
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+env:
+  GALLERY_SHA: 63e6ee4202b441e1c904d6f78fc7b070f36bc24f
+
+jobs:
+  old-app:
+    runs-on: windows-2022
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out NuGetGallery at the pinned commit
+        uses: actions/checkout@v4
+        with:
+          repository: NuGet/NuGetGallery
+          ref: ${{ env.GALLERY_SHA }}
+          path: gallery
+          fetch-depth: 1
+
+      - name: Build (gallery build.ps1 -SkipJobs -SkipArtifacts)
+        run: .\scripts\runner\build.ps1
+
+      - name: Setup (gallery tools\Setup-DevEnvironment.ps1)
+        run: .\scripts\runner\setup.ps1
+
+      - name: Start IIS Express and wait for the app
+        run: .\scripts\runner\start-site.ps1
+
+      - name: Save auth form markup
+        run: .\scripts\runner\fetch-forms.ps1
+
+      - name: Diagnostics
+        if: always()
+        run: .\scripts\runner\diagnostics.ps1
+
+      - name: Upload outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spike-out
+          path: out/
+          if-no-files-found: warn
