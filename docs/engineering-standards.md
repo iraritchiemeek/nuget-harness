@@ -99,7 +99,7 @@ A rule may be raised or lowered only in `.editorconfig`, with a comment giving t
 - Central package versions in `Directory.Packages.props`.
 - CodeQL runs on every push.
 - Third-party GitHub Actions are pinned by SHA.
-- Kestrel request limits stay at their defaults or tighter. Query parameters have length limits that match the old app's behaviour.
+- Kestrel request limits match the old app's limits (IIS `maxQueryString`, `httpRuntime maxQueryStringLength` and similar), not the defaults, because parity needs the same requests to be accepted and refused. Query parameters have length limits that match the old app's behaviour.
 - **Container:** built with the SDK's `dotnet publish /t:PublishContainer`, on a chiseled, non-root base image.
 
 ## Operability
