@@ -1,0 +1,1 @@
+["Serilog.Sinks.Async","Serilog.Sinks.Console","Serilog.Sinks.Debug","Serilog.Sinks.File","Serilog.Sinks.InMemory","Serilog.Sinks.Map","Serilog.Sinks.PeriodicBatching","Serilog.Sinks.Seq"]

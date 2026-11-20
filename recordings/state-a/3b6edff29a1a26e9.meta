@@ -1,0 +1,7 @@
+GET /api/v2/package-versions/Seri%2Alog
+status: 400
+cache-control: private
+content-type: text/html; charset=utf-8
+strict-transport-security: max-age=31536000; includeSubDomains
+x-content-type-options: nosniff
+x-frame-options: deny

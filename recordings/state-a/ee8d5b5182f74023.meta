@@ -1,0 +1,8 @@
+GET /api/v2/package-versions/Serilog?includePrerelease=true&pad=<x*12973>
+status: 404
+cache-control: private
+connection: close
+content-type: text/html; charset=utf-8
+strict-transport-security: max-age=31536000; includeSubDomains
+x-content-type-options: nosniff
+x-frame-options: deny
