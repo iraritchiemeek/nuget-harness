@@ -10,9 +10,9 @@
 #             writes per request are recorded next to the numbers.
 #   Load      k6 (-K6), constant concurrency at each of -Levels; a warm-up of -WarmUp, discarded,
 #             then a measured run of -Duration.
-#   Database  measured apart from the timed runs, because the plan cache drops entries under load
-#             and a before-and-after difference of sys.dm_exec_query_stats then undercounts (the
-#             first runs, on ea4e68b). For each app: clear the plan cache, send the whole mix once
+#   Database  measured apart from the timed runs, because a before-and-after difference of
+#             sys.dm_exec_query_stats around a timed run undercounted the executions (the first runs,
+#             on ea4e68b; the cause was not investigated). For each app: clear the plan cache, send the whole mix once
 #             at concurrency 1, and read the NuGetGallery database's query stats, grouped by query
 #             type (the SQL text: LIKE for a prefix search, DownloadCount for most-downloaded,
 #             [Version] for package-versions). Every request runs exactly one query of its type, so

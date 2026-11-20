@@ -45,7 +45,7 @@ Four runs of [`benchmark.yml`](../../.github/workflows/benchmark.yml) on `396c87
 | Transport | HTTPS on `localhost:443`, the certificate IIS Express is set up with | HTTPS on `localhost:5443`, a self-signed certificate made in the run |
 | Certificate (read from each app's TLS handshake, every run) | `CN=localhost`, RSA 2048-bit key, sha256RSA | `CN=localhost`, RSA 2048-bit key, sha256RSA |
 | Negotiated by k6 (every request, every run) | HTTP/2 over TLS 1.3 | HTTP/2 over TLS 1.3 |
-| Logging | IIS Express's console: a line when a request starts and one when its response is sent. The gallery's own Serilog logger has no sink in this setup: no console sink, and an empty Application Insights key. | ASP.NET Core's two request lines (`Microsoft.AspNetCore.Hosting.Diagnostics` at Information, one line each), and nothing else below Warning |
+| Logging | IIS Express's console: a line when a request starts and one when its response is sent. The gallery's own Serilog logger has no sink in this setup: no console sink, and an empty Application Insights key. No IIS Express W3C log grew at its default path (`Documents\IISExpress\Logs`): the console log alone accounts for the 190 bytes per request. | ASP.NET Core's two request lines (`Microsoft.AspNetCore.Hosting.Diagnostics` at Information, one line each), and nothing else below Warning |
 | Log written, every run | 1.96 lines, 190 bytes per request | 2.00 lines, 658 bytes per request |
 
 The script fails if the two apps negotiate different HTTP or TLS versions.
@@ -53,6 +53,7 @@ The script fails if the two apps negotiate different HTTP or TLS versions.
 ## Caveats
 
 - **Log volume.** Both apps write about two lines per request to a redirected console, but the new service's lines are longer: about 3.5 times the bytes. This works against the new service.
+- **Debug build.** The old app is built the way its README says (`.\build.ps1`), whose default configuration is Debug, and its `Web.config` has `<compilation debug="true">`. The new service is a Release build. This favours the new service, by an amount not measured here. A Release build of the old app was not tried: the harness builds it one way everywhere, and the recordings were made from that build.
 - **Web server.** The old app runs on IIS Express, a development server, on .NET Framework. Under full IIS in production it may behave differently. The harness runs it on IIS Express everywhere, and this benchmark measures it as the recordings were made.
 - **Shared machine.** k6, SQL Server and the app under test share 4 logical processors, and the runner is a shared CI machine. That is why the report gives every run, with no averages, and claims only what all four runs agree on.
 - **Small data.** The database is the seed snapshot: 148 IDs, and every download count is 0. Costs on a database the size of nuget.org's were not measured. The relative reads could differ there.
@@ -128,5 +129,5 @@ Machine: AMD EPYC 7763 64-Core Processor, 4 logical processors, 16 GB, runner im
 
 - **On `ea4e68b`:** runs [44686569195](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44686569195), [44686579215](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44686579215) and [44686589944](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44686589944). They are superseded for two reasons:
   - **Not like for like.** The new service ran over plain HTTP with logging at Warning (no request lines), while the old app ran over HTTPS.
-  - **Database cost undercounted.** It was a before-and-after difference of `sys.dm_exec_query_stats` taken around each timed run. Under load, plan-cache entries were lost mid-run, so executions fell far short of the requests sent: 36 prefix executions for about 13,800 prefix requests in one case, and negative reads in another.
+  - **Database cost undercounted.** It was a before-and-after difference of `sys.dm_exec_query_stats` taken around each timed run. Under load, executions fell far short of the requests sent: 36 prefix executions for about 13,800 prefix requests in one case, and negative reads in another. The likely cause is plan-cache entries being replaced mid-run, but that was not investigated; the measurement was moved out of the timed runs instead.
 - **On `75b9fe9`:** run [44688625322](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44688625322), the first like-for-like run. It measured everything, then failed the protocol check. Both apps had negotiated HTTP/2 over TLS 1.3, but k6 lists the counts in no fixed order, so the strings did not match. This was fixed in `396c87d`.
