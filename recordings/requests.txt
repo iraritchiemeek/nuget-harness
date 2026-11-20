@@ -21,7 +21,7 @@
 # - query values that ASP.NET request validation rejects (partialId=%3Cx, partialId=%26%23x, semVerLevel=%3Cx). The old
 #   app answers 500, and its own code writes the body: ApiController.OnException sends the exception's stack trace to a
 #   local client and its message to a remote one (exploratory record run 44674677772). Neither amendment A1 nor A4
-#   covers an app-written body, so these wait for a decision; see evidence/02/reviews.md, finding A2.
+#   covers an app-written body. A known gap: see "Known gaps" in evidence/02/parity-report.md.
 
 # Seeded prefixes, one per line of seed/prefixes.txt (spec 01 check 1). Source: AutocompleteDatabasePackageIdsQuery.cs
 GET /api/v2/package-ids?partialId=Serilog
