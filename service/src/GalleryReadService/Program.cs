@@ -1,6 +1,9 @@
 using GalleryReadService;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.ConfigureKestrel(kestrel =>
+    kestrel.Limits.MaxRequestLineSize = HostingRules.MaxRequestLineSize
+);
 
 builder
     .Services.AddOptions<DatabaseOptions>()
@@ -14,6 +17,8 @@ builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database");
 var app = builder.Build();
 
 app.UseGalleryResponseHeaders();
+app.UseHostingRules();
+app.UseRouting();
 app.MapPackageEndpoints();
 app.MapHealthChecks("/health");
 

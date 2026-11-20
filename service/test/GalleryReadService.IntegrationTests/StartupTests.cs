@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Options;
 
 namespace GalleryReadService.IntegrationTests;
 
@@ -18,13 +20,14 @@ public sealed class StartupTests
     public void Startup_fails_when_the_database_is_unreachable()
     {
         using var app = new UnreachableDatabaseApp();
-        Assert.ThrowsAny<Exception>(() => app.CreateClient());
+        Assert.Throws<SqlException>(() => app.CreateClient());
     }
 
     [Fact]
     public void Startup_fails_without_a_connection_string()
     {
         using var app = new WebApplicationFactory<Program>();
-        Assert.ThrowsAny<Exception>(() => app.CreateClient());
+        var error = Assert.Throws<OptionsValidationException>(() => app.CreateClient());
+        Assert.Equal(typeof(DatabaseOptions), error.OptionsType);
     }
 }

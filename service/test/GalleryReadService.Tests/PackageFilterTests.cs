@@ -34,7 +34,7 @@ public sealed class PackageFilterTests
     [InlineData("?semVerLevel=2.0.0", false, true)]
     [InlineData("?includePrerelease=true&semVerLevel=2.0.0", true, true)]
     [InlineData("?INCLUDEPRERELEASE=true&SEMVERLEVEL=2.0.0", true, true)]
-    public void Prerelease_and_SemVer2_versions_are_hidden_unless_requested(
+    public void The_filter_is_read_from_includePrerelease_and_semVerLevel(
         string queryString,
         bool includePrerelease,
         bool includeSemVer2

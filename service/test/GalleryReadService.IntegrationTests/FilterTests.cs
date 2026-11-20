@@ -1,11 +1,12 @@
-using System.Net.Http.Json;
-
 namespace GalleryReadService.IntegrationTests;
 
 /// <summary>
 /// The includePrerelease and semVerLevel filters, against rows written for this test. The seed data
 /// holds no prerelease or SemVer 2.0.0 version, so these rows are what make the filters matter.
 /// Each row is a copy of a seeded Packages row, so every other column holds a value the old app wrote.
+/// The rows are isolated from the other tests: they belong to IDs that start with "ZzFilters", which
+/// no other test asks for, and which no other prefix in the tests matches. The database is shared by
+/// the whole test assembly and each test runs InitializeAsync, so the rows are written once.
 /// </summary>
 public sealed class FilterTests(GalleryDatabase database) : IAsyncLifetime
 {
@@ -29,46 +30,35 @@ public sealed class FilterTests(GalleryDatabase database) : IAsyncLifetime
                 INSERT INTO dbo.PackageRegistrations SELECT * FROM #r;
                 DECLARE @only int = SCOPE_IDENTITY();
 
-                SELECT TOP (1) * INTO #p FROM dbo.Packages WHERE PackageRegistrationKey =
-                    (SELECT [Key] FROM dbo.PackageRegistrations WHERE Id = N'Serilog') ORDER BY [Key];
-                ALTER TABLE #p DROP COLUMN [Key];
-                -- version, prerelease, SemVer level key (NULL = 1.0.0, 2 = 2.0.0), listed, status (0 = Available)
-                DECLARE @rows TABLE (r int, v nvarchar(64), pre bit, semver int, listed bit, status int);
-                INSERT INTO @rows VALUES
+                -- One copy of a seeded Serilog row per version below, with these columns changed:
+                -- registration, version, prerelease, SemVer level key (NULL = 1.0.0, 2 = 2.0.0),
+                -- listed, status (0 = Available).
+                SELECT p.*, c.r AS NewRegistration, c.v AS NewVersion, c.pre AS NewPrerelease,
+                    c.semver AS NewSemVer, c.listed AS NewListed, c.status AS NewStatus
+                INTO #p
+                FROM (SELECT TOP (1) * FROM dbo.Packages WHERE PackageRegistrationKey =
+                    (SELECT [Key] FROM dbo.PackageRegistrations WHERE Id = N'Serilog') ORDER BY [Key]) AS p
+                CROSS JOIN (VALUES
                     (@id, N'1.0.0', 0, NULL, 1, 0),
                     (@id, N'2.0.0-beta', 1, NULL, 1, 0),
                     (@id, N'3.0.0-rc.1', 1, 2, 1, 0),
                     (@id, N'4.0.0+meta', 0, 2, 1, 0),
                     (@id, N'5.0.0', 0, NULL, 0, 0),
                     (@id, N'6.0.0', 0, NULL, 1, 1),
-                    (@only, N'1.0.0-rc.1', 1, 2, 1, 0);
-                DECLARE @r int, @v nvarchar(64), @pre bit, @semver int, @listed bit, @status int;
-                DECLARE rows CURSOR LOCAL FOR SELECT r, v, pre, semver, listed, status FROM @rows;
-                OPEN rows;
-                FETCH NEXT FROM rows INTO @r, @v, @pre, @semver, @listed, @status;
-                WHILE @@FETCH_STATUS = 0
-                BEGIN
-                    UPDATE #p SET PackageRegistrationKey = @r, Version = @v, NormalizedVersion = @v,
-                        IsPrerelease = @pre, SemVerLevelKey = @semver, Listed = @listed, PackageStatusKey = @status;
-                    INSERT INTO dbo.Packages SELECT * FROM #p;
-                    FETCH NEXT FROM rows INTO @r, @v, @pre, @semver, @listed, @status;
-                END;
+                    (@only, N'1.0.0-rc.1', 1, 2, 1, 0)
+                ) AS c (r, v, pre, semver, listed, status);
+                UPDATE #p SET PackageRegistrationKey = NewRegistration, Version = NewVersion,
+                    NormalizedVersion = NewVersion, IsPrerelease = NewPrerelease, SemVerLevelKey = NewSemVer,
+                    Listed = NewListed, PackageStatusKey = NewStatus;
+                ALTER TABLE #p DROP COLUMN [Key], NewRegistration, NewVersion, NewPrerelease, NewSemVer,
+                    NewListed, NewStatus;
+                INSERT INTO dbo.Packages SELECT * FROM #p;
             END;
             COMMIT;
             """
         );
 
     public ValueTask DisposeAsync() => _app.DisposeAsync();
-
-    private async Task<string[]> GetJsonAsync(string path)
-    {
-        using var client = _app.CreateClient();
-        var result = await client.GetFromJsonAsync<string[]>(
-            new Uri(path, UriKind.Relative),
-            TestContext.Current.CancellationToken
-        );
-        return result ?? throw new InvalidOperationException($"{path} returned null");
-    }
 
     [Theory]
     [InlineData("", new[] { "1.0.0" })]
@@ -84,7 +74,7 @@ public sealed class FilterTests(GalleryDatabase database) : IAsyncLifetime
     )
     {
         // No ORDER BY in the old app's version query, so the order is the query plan's: compare as sets.
-        var versions = await GetJsonAsync($"/api/v2/package-versions/{Id}{query}");
+        var versions = await _app.GetJsonAsync($"/api/v2/package-versions/{Id}{query}");
         Assert.Equal(
             expected.Order(StringComparer.Ordinal),
             versions.Order(StringComparer.Ordinal)
@@ -98,10 +88,13 @@ public sealed class FilterTests(GalleryDatabase database) : IAsyncLifetime
     [InlineData("&includePrerelease=true&semVerLevel=2.0.0", true)]
     public async Task An_id_counts_only_if_one_of_its_versions_passes_the_filter(
         string query,
-        bool listed
+        bool includesTheSemVer2PrereleaseOnlyId
     )
     {
-        var ids = await GetJsonAsync($"/api/v2/package-ids?partialId={Id}{query}");
-        Assert.Equal(listed ? [Id, OnlySemVer2PrereleaseId] : [Id], ids);
+        var ids = await _app.GetJsonAsync($"/api/v2/package-ids?partialId={Id}{query}");
+        Assert.Equal(
+            includesTheSemVer2PrereleaseOnlyId ? [Id, OnlySemVer2PrereleaseId] : [Id],
+            ids
+        );
     }
 }

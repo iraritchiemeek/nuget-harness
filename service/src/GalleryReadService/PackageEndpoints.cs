@@ -14,10 +14,10 @@ internal static class PackageEndpoints
     /// <summary>
     /// The old app serialises with MVC 5's JsonResult (JavaScriptSerializer), which does not escape
     /// <c>+</c>, as in a version with build metadata such as <c>1.0.0+abc</c>. System.Text.Json's
-    /// default encoder would write it as <c>+</c>. The relaxed encoder writes it as is. It is
+    /// default encoder would write it as <c>\u002B</c>. The relaxed encoder writes it as is. It is
     /// "unsafe" only for embedding in HTML, and these responses are JSON.
     /// </summary>
-    internal static readonly JsonSerializerOptions Json = new()
+    internal static readonly JsonSerializerOptions JsonOptions = new()
     {
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
@@ -42,31 +42,23 @@ internal static class PackageEndpoints
             PackageFilter.FromQuery(request.Query),
             cancellationToken
         );
-        return TypedResults.Json(ids, Json);
+        return TypedResults.Json(ids, JsonOptions);
     }
 
-    internal static async Task<
-        Results<JsonHttpResult<IReadOnlyList<string>>, NotFound>
-    > GetPackageVersionsAsync(
+    internal static async Task<JsonHttpResult<IReadOnlyList<string>>> GetPackageVersionsAsync(
         string id,
         HttpRequest request,
         PackageQueries queries,
         CancellationToken cancellationToken
     )
     {
-        // A blank id never reaches the old app's code: IIS trims the trailing spaces, finds no route
-        // and answers 404.4 with its own error page (recorded for %20 and %20%20). The status is
-        // matched; the page is not copied, as it describes the hosting machine (spec 02 amendment A4).
-        if (string.IsNullOrWhiteSpace(id))
-        {
-            return TypedResults.NotFound();
-        }
-
+        // A blank id never gets here: the old app's web server trims trailing white space from the
+        // path, and an empty segment matches no route (HostingRules.RoutingPath).
         var versions = await queries.GetPackageVersionsAsync(
             id,
             PackageFilter.FromQuery(request.Query),
             cancellationToken
         );
-        return TypedResults.Json(versions, Json);
+        return TypedResults.Json(versions, JsonOptions);
     }
 }
