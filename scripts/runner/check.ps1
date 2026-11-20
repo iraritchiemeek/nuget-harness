@@ -6,7 +6,7 @@ $checkDir = Join-Path $OutDir 'checks'
 New-Item -ItemType Directory -Force -Path $checkDir | Out-Null
 $expected = Get-Content (Join-Path $OutDir 'seed\expected.json') -Raw | ConvertFrom-Json
 $ids = @($expected.PSObject.Properties.Name)
-$prefixes = Get-Prefixes
+$prefixes = Get-PrefixList
 $statusOf = @{}
 Get-Content (Join-Path $Dir '_status.tsv') | ForEach-Object { $c = $_ -split "`t"; $statusOf["$($c[0])|$($c[1])"] = [int]$c[2] }
 

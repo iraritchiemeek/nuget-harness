@@ -1,0 +1,36 @@
+name: lint
+
+# Static checks on every push: the harness scripts (PowerShell and Python) and the workflows.
+# Every tool is pinned, so a new release cannot change the result.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  harness:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: PSScriptAnalyzer (settings in PSScriptAnalyzerSettings.psd1)
+        shell: pwsh
+        run: |
+          Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser -Force
+          $findings = @(Invoke-ScriptAnalyzer -Path scripts -Recurse -Settings ./PSScriptAnalyzerSettings.psd1)
+          $findings | Format-Table ScriptName, Line, Severity, RuleName, Message -AutoSize -Wrap | Out-String -Width 220 | Write-Host
+          if ($findings.Count) { throw "PSScriptAnalyzer: $($findings.Count) finding(s)" }
+          Write-Host 'PSScriptAnalyzer: no findings'
+
+      - name: ruff (settings in ruff.toml)
+        run: |
+          pipx run ruff==0.17.6 check .
+          pipx run ruff==0.17.6 format --check .
+
+      - name: actionlint
+        run: docker run --rm -v "$PWD:/repo" --workdir /repo rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 -color # 1.7.12

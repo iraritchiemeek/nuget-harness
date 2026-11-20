@@ -10,7 +10,13 @@ package-ids and package-versions endpoints hide SemVer2 by default.
 
 Output lines: "<Id> <normalized-version>", grouped by family, sorted.
 """
-import json, re, sys, urllib.request, xml.etree.ElementTree as ET
+
+import json
+import re
+import sys
+import urllib.error
+import urllib.request
+import xml.etree.ElementTree as ET
 
 FLAT = "https://api.nuget.org/v3-flatcontainer"
 MAX_BYTES = 4 * 1024 * 1024
@@ -18,21 +24,58 @@ VERSIONS_PER_ID = 3
 
 # Families share a prefix so the package-ids prefix checks mean something.
 FAMILIES = {
-    "Serilog": ["Serilog", "Serilog.AspNetCore", "Serilog.Enrichers.Environment", "Serilog.Enrichers.Thread",
-                "Serilog.Enrichers.Process", "Serilog.Extensions.Hosting", "Serilog.Extensions.Logging",
-                "Serilog.Formatting.Compact", "Serilog.Settings.Configuration", "Serilog.Sinks.Async",
-                "Serilog.Sinks.Console", "Serilog.Sinks.Debug", "Serilog.Sinks.File",
-                "Serilog.Sinks.PeriodicBatching", "Serilog.Sinks.Seq", "Serilog.Exceptions"],
+    "Serilog": [
+        "Serilog",
+        "Serilog.AspNetCore",
+        "Serilog.Enrichers.Environment",
+        "Serilog.Enrichers.Thread",
+        "Serilog.Enrichers.Process",
+        "Serilog.Extensions.Hosting",
+        "Serilog.Extensions.Logging",
+        "Serilog.Formatting.Compact",
+        "Serilog.Settings.Configuration",
+        "Serilog.Sinks.Async",
+        "Serilog.Sinks.Console",
+        "Serilog.Sinks.Debug",
+        "Serilog.Sinks.File",
+        "Serilog.Sinks.PeriodicBatching",
+        "Serilog.Sinks.Seq",
+        "Serilog.Exceptions",
+    ],
     "Newtonsoft": ["Newtonsoft.Json", "Newtonsoft.Json.Bson", "Newtonsoft.Json.Schema"],
-    "xunit": ["xunit", "xunit.abstractions", "xunit.analyzers", "xunit.assert", "xunit.core",
-              "xunit.extensibility.core", "xunit.extensibility.execution", "xunit.runner.console",
-              "xunit.runner.visualstudio"],
+    "xunit": [
+        "xunit",
+        "xunit.abstractions",
+        "xunit.analyzers",
+        "xunit.assert",
+        "xunit.core",
+        "xunit.extensibility.core",
+        "xunit.extensibility.execution",
+        "xunit.runner.console",
+        "xunit.runner.visualstudio",
+    ],
     "NUnit": ["NUnit", "NUnit3TestAdapter", "NUnit.Analyzers", "NUnitLite"],
-    "Polly": ["Polly", "Polly.Core", "Polly.Extensions", "Polly.Extensions.Http", "Polly.Contrib.WaitAndRetry",
-              "Polly.RateLimiting"],
-    "AutoMapper": ["AutoMapper", "AutoMapper.Collection", "AutoMapper.Extensions.Microsoft.DependencyInjection"],
-    "Fluent": ["FluentValidation", "FluentValidation.AspNetCore", "FluentValidation.DependencyInjectionExtensions",
-               "FluentAssertions", "FluentMigrator", "FluentMigrator.Runner"],
+    "Polly": [
+        "Polly",
+        "Polly.Core",
+        "Polly.Extensions",
+        "Polly.Extensions.Http",
+        "Polly.Contrib.WaitAndRetry",
+        "Polly.RateLimiting",
+    ],
+    "AutoMapper": [
+        "AutoMapper",
+        "AutoMapper.Collection",
+        "AutoMapper.Extensions.Microsoft.DependencyInjection",
+    ],
+    "Fluent": [
+        "FluentValidation",
+        "FluentValidation.AspNetCore",
+        "FluentValidation.DependencyInjectionExtensions",
+        "FluentAssertions",
+        "FluentMigrator",
+        "FluentMigrator.Runner",
+    ],
     "Dapper": ["Dapper", "Dapper.Contrib", "Dapper.SqlBuilder"],
     "MediatR": ["MediatR", "MediatR.Contracts", "MediatR.Extensions.Microsoft.DependencyInjection"],
     "Moq": ["Moq", "Moq.AutoMock"],
@@ -42,46 +85,119 @@ FAMILIES = {
     "RestSharp": ["RestSharp", "RestSharp.Serializers.NewtonsoftJson"],
     "StackExchange": ["StackExchange.Redis"],
     "Castle": ["Castle.Core", "Castle.Windsor"],
-    "Autofac": ["Autofac", "Autofac.Extensions.DependencyInjection", "Autofac.Mvc5", "Autofac.WebApi2"],
+    "Autofac": [
+        "Autofac",
+        "Autofac.Extensions.DependencyInjection",
+        "Autofac.Mvc5",
+        "Autofac.WebApi2",
+    ],
     "Microsoft.Extensions.Logging": [
-        "Microsoft.Extensions.Logging", "Microsoft.Extensions.Logging.Abstractions",
-        "Microsoft.Extensions.Logging.Configuration", "Microsoft.Extensions.Logging.Console",
-        "Microsoft.Extensions.Logging.Debug", "Microsoft.Extensions.Logging.EventLog",
-        "Microsoft.Extensions.Logging.EventSource", "Microsoft.Extensions.Logging.TraceSource"],
+        "Microsoft.Extensions.Logging",
+        "Microsoft.Extensions.Logging.Abstractions",
+        "Microsoft.Extensions.Logging.Configuration",
+        "Microsoft.Extensions.Logging.Console",
+        "Microsoft.Extensions.Logging.Debug",
+        "Microsoft.Extensions.Logging.EventLog",
+        "Microsoft.Extensions.Logging.EventSource",
+        "Microsoft.Extensions.Logging.TraceSource",
+    ],
     "Microsoft.Extensions.Configuration": [
-        "Microsoft.Extensions.Configuration", "Microsoft.Extensions.Configuration.Abstractions",
-        "Microsoft.Extensions.Configuration.Binder", "Microsoft.Extensions.Configuration.CommandLine",
-        "Microsoft.Extensions.Configuration.EnvironmentVariables", "Microsoft.Extensions.Configuration.FileExtensions",
-        "Microsoft.Extensions.Configuration.Json", "Microsoft.Extensions.Configuration.UserSecrets",
-        "Microsoft.Extensions.Configuration.Xml", "Microsoft.Extensions.Configuration.Ini"],
+        "Microsoft.Extensions.Configuration",
+        "Microsoft.Extensions.Configuration.Abstractions",
+        "Microsoft.Extensions.Configuration.Binder",
+        "Microsoft.Extensions.Configuration.CommandLine",
+        "Microsoft.Extensions.Configuration.EnvironmentVariables",
+        "Microsoft.Extensions.Configuration.FileExtensions",
+        "Microsoft.Extensions.Configuration.Json",
+        "Microsoft.Extensions.Configuration.UserSecrets",
+        "Microsoft.Extensions.Configuration.Xml",
+        "Microsoft.Extensions.Configuration.Ini",
+    ],
     "Microsoft.Extensions.DependencyInjection": [
-        "Microsoft.Extensions.DependencyInjection", "Microsoft.Extensions.DependencyInjection.Abstractions"],
+        "Microsoft.Extensions.DependencyInjection",
+        "Microsoft.Extensions.DependencyInjection.Abstractions",
+    ],
     "Microsoft.Extensions.Primitives": ["Microsoft.Extensions.Primitives"],
-    "System.Collections": ["System.Collections", "System.Collections.Concurrent", "System.Collections.Immutable",
-                           "System.Collections.NonGeneric", "System.Collections.Specialized"],
-    "System.Text": ["System.Text.Encoding", "System.Text.Encoding.Extensions", "System.Text.Encodings.Web",
-                    "System.Text.Json", "System.Text.RegularExpressions"],
-    "System.Memory": ["System.Memory", "System.Buffers", "System.Numerics.Vectors",
-                      "System.Runtime.CompilerServices.Unsafe", "System.Threading.Tasks.Extensions"],
-    "misc": ["Bogus", "Swashbuckle.AspNetCore", "Swashbuckle.AspNetCore.Swagger", "Swashbuckle.AspNetCore.SwaggerGen",
-             "Swashbuckle.AspNetCore.SwaggerUI", "HtmlAgilityPack", "Hangfire.Core", "Hangfire.SqlServer",
-             "Quartz", "Quartz.Extensions.Hosting", "YamlDotNet", "SharpZipLib", "DotNetZip", "log4net", "NLog",
-             "NLog.Extensions.Logging", "NLog.Web.AspNetCore", "Spectre.Console", "CommandLineParser",
-             "MimeKit", "MailKit", "BouncyCastle.Cryptography", "Ardalis.GuardClauses", "Ardalis.Specification",
-             "OneOf", "Scrutor", "Refit", "Refit.HttpClientFactory", "Nito.AsyncEx", "Nito.AsyncEx.Coordination",
-             "Nito.Disposables", "Ninject", "Unity", "SimpleInjector", "Shouldly", "NSubstitute",
-             "AutoFixture", "AutoFixture.Xunit2", "AutoFixture.AutoMoq", "Stateless", "Polly.Caching.Memory"],
+    "System.Collections": [
+        "System.Collections",
+        "System.Collections.Concurrent",
+        "System.Collections.Immutable",
+        "System.Collections.NonGeneric",
+        "System.Collections.Specialized",
+    ],
+    "System.Text": [
+        "System.Text.Encoding",
+        "System.Text.Encoding.Extensions",
+        "System.Text.Encodings.Web",
+        "System.Text.Json",
+        "System.Text.RegularExpressions",
+    ],
+    "System.Memory": [
+        "System.Memory",
+        "System.Buffers",
+        "System.Numerics.Vectors",
+        "System.Runtime.CompilerServices.Unsafe",
+        "System.Threading.Tasks.Extensions",
+    ],
+    "misc": [
+        "Bogus",
+        "Swashbuckle.AspNetCore",
+        "Swashbuckle.AspNetCore.Swagger",
+        "Swashbuckle.AspNetCore.SwaggerGen",
+        "Swashbuckle.AspNetCore.SwaggerUI",
+        "HtmlAgilityPack",
+        "Hangfire.Core",
+        "Hangfire.SqlServer",
+        "Quartz",
+        "Quartz.Extensions.Hosting",
+        "YamlDotNet",
+        "SharpZipLib",
+        "DotNetZip",
+        "log4net",
+        "NLog",
+        "NLog.Extensions.Logging",
+        "NLog.Web.AspNetCore",
+        "Spectre.Console",
+        "CommandLineParser",
+        "MimeKit",
+        "MailKit",
+        "BouncyCastle.Cryptography",
+        "Ardalis.GuardClauses",
+        "Ardalis.Specification",
+        "OneOf",
+        "Scrutor",
+        "Refit",
+        "Refit.HttpClientFactory",
+        "Nito.AsyncEx",
+        "Nito.AsyncEx.Coordination",
+        "Nito.Disposables",
+        "Ninject",
+        "Unity",
+        "SimpleInjector",
+        "Shouldly",
+        "NSubstitute",
+        "AutoFixture",
+        "AutoFixture.Xunit2",
+        "AutoFixture.AutoMoq",
+        "Stateless",
+        "Polly.Caching.Memory",
+    ],
 }
+
 
 def get(url):
     req = urllib.request.Request(url, headers={"User-Agent": "nuget-harness-seed-list"})
     with urllib.request.urlopen(req, timeout=60) as r:
         return r.read()
 
+
 def head_len(url):
-    req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": "nuget-harness-seed-list"})
+    req = urllib.request.Request(
+        url, method="HEAD", headers={"User-Agent": "nuget-harness-seed-list"}
+    )
     with urllib.request.urlopen(req, timeout=60) as r:
         return int(r.headers.get("Content-Length", "0"))
+
 
 def is_semver2_version(v):
     v = v.strip()
@@ -91,6 +207,7 @@ def is_semver2_version(v):
         label = v.split("-", 1)[1]
         return "." in label
     return False
+
 
 def nuspec_is_semver2(xml_bytes):
     root = ET.fromstring(xml_bytes)
@@ -105,6 +222,7 @@ def nuspec_is_semver2(xml_bytes):
                 if part and ("+" in part or "-" in part):
                     return True  # prerelease or metadata dependency: treat as excluded to be safe
     return False
+
 
 def pick(versions):
     stable = [v for v in versions if "-" not in v and "+" not in v]
@@ -121,6 +239,7 @@ def pick(versions):
             out.append(v)
     return out[:VERSIONS_PER_ID]
 
+
 def main():
     lines = []
     for family, ids in FAMILIES.items():
@@ -129,7 +248,7 @@ def main():
             low = pid.lower()
             try:
                 versions = json.loads(get(f"{FLAT}/{low}/index.json"))["versions"]
-            except Exception as e:
+            except (urllib.error.URLError, KeyError, ValueError) as e:
                 print(f"skip {pid}: {e}", file=sys.stderr)
                 continue
             kept = 0
@@ -147,9 +266,13 @@ def main():
             if kept == 0:
                 print(f"no versions kept for {pid}", file=sys.stderr)
     with open(sys.argv[1] if len(sys.argv) > 1 else "seed/packages.txt", "w") as f:
-        f.write("# Fixed seed list. Format: <Id> <normalized version as used by the nuget.org flat container>.\n")
+        f.write(
+            "# Fixed seed list. Format: <Id> "
+            "<normalized version as used by the nuget.org flat container>.\n"
+        )
         f.write("# Generated once by scripts/make-seed-list.py, then committed and kept fixed.\n")
         f.write("\n".join(lines) + "\n")
+
 
 if __name__ == "__main__":
     main()

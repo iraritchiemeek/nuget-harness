@@ -16,7 +16,7 @@ New-Item -ItemType Directory -Force -Path $secretDir | Out-Null
 $jar = Join-Path $secretDir 'cookies.txt'
 if (Test-Path $jar) { Remove-Item $jar }
 
-function New-Secret([int]$Length) {
+function Get-RandomSecret([int]$Length) {
     $bytes = New-Object byte[] 64
     [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
     $s = ([Convert]::ToBase64String($bytes) -replace '[^A-Za-z0-9]', '').Substring(0, $Length)
@@ -44,13 +44,13 @@ function Invoke-FormPost([string]$Url, [hashtable]$Fields, [string]$OutFile, [st
     $code = & curl.exe -sS -k -b $jar -c $jar -o $OutFile -D $hdrFile -w '%{http_code}' `
         -H 'Content-Type: application/x-www-form-urlencoded' --data-binary "@$bodyFile" "$BaseUrl$Url"
     Remove-Item $bodyFile
-    Show-Headers "POST $Url"
+    Show-ResponseHeader "POST $Url"
     return [int]$code
 }
 
 $hdrFile = Join-Path $secretDir 'headers.txt'
 # Log status, Location and the names (never values) of cookies set, for debugging the flow.
-function Show-Headers([string]$What) {
+function Show-ResponseHeader([string]$What) {
     $h = Get-Content $hdrFile
     $loc = ($h | Where-Object { $_ -match '^Location:' }) -join ' '
     $cookies = ($h | Where-Object { $_ -match '^Set-Cookie:\s*([^=]+)=' } | ForEach-Object { ([regex]::Match($_, '^Set-Cookie:\s*([^=]+)=')).Groups[1].Value }) -join ','
@@ -59,14 +59,14 @@ function Show-Headers([string]$What) {
 
 function Get-Page([string]$Path, [string]$OutFile) {
     $code = [int](& curl.exe -sS -k -b $jar -c $jar -o $OutFile -D $hdrFile -w '%{http_code}' "$BaseUrl$Path")
-    Show-Headers "GET $Path"
+    Show-ResponseHeader "GET $Path"
     return $code
 }
 
 # ---- 1. register ----------------------------------------------------------------------------
 $username = 'seeduser'
 $email = 'seeduser@example.com'   # placeholder, not a real mailbox; the DB backup artifact is public
-$password = New-Secret 24
+$password = Get-RandomSecret 24
 Write-Host "::add-mask::$password"
 # Kept in RUNNER_TEMP (never uploaded) only so secret-scan.ps1 can prove it is not in any artifact.
 Set-Content -Path $PasswordFile -Value $password -NoNewline

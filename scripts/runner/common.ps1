@@ -61,7 +61,7 @@ function Invoke-Sql {
 }
 
 # The prefixes for the package-ids check, from seed\prefixes.txt (comments and blanks skipped).
-function Get-Prefixes {
+function Get-PrefixList {
     return @(Get-Content (Join-Path $RepoRoot 'seed\prefixes.txt') |
         Where-Object { $_ -and -not $_.StartsWith('#') } | ForEach-Object { $_.Trim() })
 }

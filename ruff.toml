@@ -1,0 +1,7 @@
+# ruff settings for the harness's Python (scripts/make-seed-list.py). Rules are listed so the
+# result does not depend on the ruff version's defaults.
+target-version = "py312"
+line-length = 100
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP", "BLE", "EXE"]
