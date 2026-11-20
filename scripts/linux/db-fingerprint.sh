@@ -9,8 +9,7 @@
 set -euo pipefail
 : "${SA_PASSWORD:?SA_PASSWORD must be set}"
 
-docker exec nuget-sql /opt/mssql-tools18/bin/sqlcmd -C -b -S localhost -U sa -P "$SA_PASSWORD" \
-  -d NuGetGallery -h -1 -W -s ' ' -Q "SET NOCOUNT ON;
+"$(dirname "$0")/sqlcmd.sh" -d NuGetGallery -h -1 -W -s ' ' -Q "SET NOCOUNT ON;
   DECLARE @sql nvarchar(max) = N'';
   SELECT @sql += N'SELECT N''' + s.name + N'.' + t.name + N''' AS t, COUNT_BIG(*) AS n, CHECKSUM_AGG(BINARY_CHECKSUM(*)) AS c FROM '
     + QUOTENAME(s.name) + N'.' + QUOTENAME(t.name) + N' UNION ALL '

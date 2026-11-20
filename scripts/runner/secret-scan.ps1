@@ -1,11 +1,17 @@
-# Fail if the raw API key or account password appears anywhere under the given folder, as
-# ASCII/UTF-8 or as UTF-16LE (SQL Server stores nvarchar as UTF-16). Run before every upload.
+# Fail if a secret made in this job appears anywhere under the given folder, as ASCII/UTF-8 or as
+# UTF-16LE (SQL Server stores nvarchar as UTF-16). Run before every upload. The secrets: the
+# gallery's API key and account password (Windows jobs, files written by seed.ps1), and the SQL
+# Server sa and reader passwords (Linux jobs, SA_PASSWORD and READER_PASSWORD in the environment).
 # Prints only file names and which secret matched, never the secret.
 param([Parameter(Mandatory)] [string]$Dir)
 . "$PSScriptRoot\common.ps1"
 $secrets = @{}
 foreach ($s in @{ Name = 'apikey'; File = $ApiKeyFile }, @{ Name = 'password'; File = $PasswordFile }) {
     if (Test-Path $s.File) { $secrets[$s.Name] = (Get-Content $s.File -Raw).Trim() }
+}
+foreach ($name in 'SA_PASSWORD', 'READER_PASSWORD') {
+    $value = [Environment]::GetEnvironmentVariable($name)
+    if ($value) { $secrets[$name] = $value }
 }
 if ($secrets.Count -eq 0) { Write-Host 'no secrets were created in this job; nothing to scan'; return }
 

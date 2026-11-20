@@ -1,0 +1,3 @@
+# ruff for the lint workflow, installed with pip --require-hashes so a replaced wheel fails the install.
+ruff==0.17.6 \
+    --hash=sha256:aa3b08254a732acba246891089a152c47c5733dc36b8ecb76ce8602f8326e5e4

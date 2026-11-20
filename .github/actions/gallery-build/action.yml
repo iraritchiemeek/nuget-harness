@@ -28,6 +28,7 @@ runs:
         ref: ${{ inputs.gallery-sha }}
         path: gallery
         fetch-depth: 1
+        persist-credentials: false
 
     - name: Park .NET SDKs newer than 9 (runner change, not app change)
       shell: powershell

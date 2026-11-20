@@ -1,7 +1,9 @@
 name: lint
 
 # Static checks on every push: the harness scripts (PowerShell and Python) and the workflows.
-# Every tool is pinned, so a new release cannot change the result.
+# Every tool is pinned to a version and checked by hash (PSScriptAnalyzer by package SHA-256, ruff
+# with pip --require-hashes, actionlint by image digest), so neither a new release nor a replaced
+# package can change the result.
 
 on:
   push:
@@ -17,11 +19,18 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: PSScriptAnalyzer (settings in PSScriptAnalyzerSettings.psd1)
         shell: pwsh
         run: |
-          Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser -Force
+          $package = "$env:RUNNER_TEMP/PSScriptAnalyzer.zip"   # a .nupkg is a zip file
+          Invoke-WebRequest https://www.powershellgallery.com/api/v2/package/PSScriptAnalyzer/1.25.0 -OutFile $package
+          $sha = (Get-FileHash $package -Algorithm SHA256).Hash
+          if ($sha -ne '14E634C828EB98EFB9F40B2918BA90F139ED5ECCDF663A2A747736D996995D60') { throw "PSScriptAnalyzer 1.25.0 has SHA-256 $sha" }
+          Expand-Archive $package "$env:RUNNER_TEMP/PSScriptAnalyzer"
+          Import-Module "$env:RUNNER_TEMP/PSScriptAnalyzer/PSScriptAnalyzer.psd1"
           $findings = @(Invoke-ScriptAnalyzer -Path scripts -Recurse -Settings ./PSScriptAnalyzerSettings.psd1)
           $findings | Format-Table ScriptName, Line, Severity, RuleName, Message -AutoSize -Wrap | Out-String -Width 220 | Write-Host
           if ($findings.Count) { throw "PSScriptAnalyzer: $($findings.Count) finding(s)" }
@@ -29,8 +38,10 @@ jobs:
 
       - name: ruff (settings in ruff.toml)
         run: |
-          pipx run ruff==0.17.6 check .
-          pipx run ruff==0.17.6 format --check .
+          python3 -m venv "$RUNNER_TEMP/ruff"
+          "$RUNNER_TEMP/ruff/bin/pip" install --quiet --require-hashes --only-binary :all: -r .github/lint-requirements.txt
+          "$RUNNER_TEMP/ruff/bin/ruff" check .
+          "$RUNNER_TEMP/ruff/bin/ruff" format --check .
 
       - name: actionlint
         run: docker run --rm -v "$PWD:/repo" --workdir /repo rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 -color # 1.7.12

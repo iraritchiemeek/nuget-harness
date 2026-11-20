@@ -1,0 +1,15 @@
+# Weekly update pull requests for the pinned dependencies Dependabot can read: the SHA-pinned
+# actions in the workflows and the composite actions, and the service's NuGet packages (central
+# versions and lock files). The container images (SQL Server in scripts/linux/sql-server.sh and
+# GalleryDatabase.cs, actionlint in lint.yml) are pinned by digest outside any Dockerfile, where
+# Dependabot's docker updater does not look, so they are updated by hand.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directories: ['/', '/.github/actions/*']
+    schedule:
+      interval: weekly
+  - package-ecosystem: nuget
+    directory: /service
+    schedule:
+      interval: weekly

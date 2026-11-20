@@ -12,8 +12,14 @@ recordings=$1 publish=$2 image=$3
 work=$(mktemp -d)
 mkdir "$work/image"
 container=$(docker create "$image")
-docker export "$container" | tar -x -C "$work/image" 2>/dev/null || true
+docker export -o "$work/image.tar" "$container"
 docker rm "$container" >/dev/null
+# Device nodes cannot be created without root, and hold no files to check.
+tar -x -f "$work/image.tar" -C "$work/image" --no-same-owner --exclude='dev/*'
+if ! find "$work/image" -type f -name GalleryReadService.dll | grep -q .; then
+  echo "the exported image has no GalleryReadService.dll, so the export is not the service: $(find "$work/image" -type f | wc -l) files"
+  exit 1
+fi
 
 # The ten largest JSON bodies: one line, starting with [.
 mapfile -t json_bodies < <(for f in "$recordings"/*/*.body; do

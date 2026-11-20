@@ -15,12 +15,12 @@ snapshot_dir=$(cd "$1" && pwd)
 : "${SA_PASSWORD:?SA_PASSWORD must be set}"
 : "${READER_PASSWORD:?READER_PASSWORD must be set}"
 
-docker run -d --name "$CONTAINER" -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD="$SA_PASSWORD" \
-  -p 1433:1433 -v "$snapshot_dir:/snapshot:ro" "$SQL_IMAGE" >/dev/null
+# The password comes from the environment, and the port is reachable from this machine only.
+export MSSQL_SA_PASSWORD=$SA_PASSWORD
+docker run -d --name "$CONTAINER" -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD \
+  -p 127.0.0.1:1433:1433 -v "$snapshot_dir:/snapshot:ro" "$SQL_IMAGE" >/dev/null
 
-sql() {
-  docker exec "$CONTAINER" /opt/mssql-tools18/bin/sqlcmd -C -b -S localhost -U sa -P "$SA_PASSWORD" -W -s '|' "$@"
-}
+sql() { "$(dirname "$0")/sqlcmd.sh" -W -s '|' "$@"; }
 
 for _ in $(seq 1 60); do
   if sql -Q 'SELECT 1' >/dev/null 2>&1; then break; fi
@@ -38,7 +38,7 @@ sql -Q "SET NOCOUNT ON;
 
 # The service's login can read and nothing else (spec 02, done-when 7).
 sql -Q "SET NOCOUNT ON;
-  CREATE LOGIN [reader] WITH PASSWORD = N'$READER_PASSWORD', CHECK_POLICY = OFF;
+  CREATE LOGIN [reader] WITH PASSWORD = N'\$(READER_PASSWORD)', CHECK_POLICY = OFF;
   USE [NuGetGallery];
   CREATE USER [reader] FOR LOGIN [reader];
   ALTER ROLE [db_datareader] ADD MEMBER [reader];
