@@ -1,0 +1,7 @@
+GET /api/v2/package-versions/NUnit.Analyzers
+status: 200
+cache-control: private
+content-type: application/json; charset=utf-8
+strict-transport-security: max-age=31536000; includeSubDomains
+x-content-type-options: nosniff
+x-frame-options: deny
