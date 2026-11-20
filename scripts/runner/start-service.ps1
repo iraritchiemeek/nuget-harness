@@ -2,7 +2,8 @@
 # on http://localhost:5080, reading the same LocalDB database as the old app with the read-only
 # login `reader` (db_datareader only). The login's password is generated here and masked. Like
 # IIS Express (start-site.ps1), the service is created through WMI so it outlives the step.
-param([Parameter(Mandatory)] [string]$ServiceDir, [string]$Url = 'http://localhost:5080')
+# -Arguments are added to the service's command line, as configuration (--Key=value).
+param([Parameter(Mandatory)] [string]$ServiceDir, [string]$Url = 'http://localhost:5080', [string[]]$Arguments = @())
 . "$PSScriptRoot\common.ps1"
 $bytes = New-Object byte[] 16
 [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
@@ -21,7 +22,8 @@ if (($roles -join ',') -ne 'db_datareader') { throw "reader has roles $($roles -
 $exe = Join-Path (Resolve-Path $ServiceDir).Path 'GalleryReadService.exe'
 $log = Join-Path $OutDir 'service.log'
 $cs = "Server=(localdb)\MSSQLLocalDB;Database=NuGetGallery;User Id=reader;Password=$password;TrustServerCertificate=True"
-$cmdLine = "cmd.exe /c `"`"$exe`" --urls $Url `"--Database:ConnectionString=$cs`" > `"$log`" 2>&1`""
+$extra = -join ($Arguments | ForEach-Object { " `"$_`"" })
+$cmdLine = "cmd.exe /c `"`"$exe`" --urls $Url `"--Database:ConnectionString=$cs`"$extra > `"$log`" 2>&1`""
 $r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $cmdLine }
 if ($r.ReturnValue -ne 0) { throw "Win32_Process.Create returned $($r.ReturnValue)" }
 foreach ($i in 1..60) {

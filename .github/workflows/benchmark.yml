@@ -1,0 +1,117 @@
+name: benchmark
+
+# Spec 02b: the old app and the new service on one windows-2022 runner, reading the same LocalDB
+# database (state A, the seed snapshot), each loaded in turn with the same request mix by a pinned
+# k6 (scripts/runner/benchmark.ps1). Publishes requests per second, p50, p95 and p99 latency and
+# errors per app and concurrency level, and SQL Server's logical reads and CPU time per query type.
+# It measures; it never fails on speed. Run by hand, at least three times, alternating which app
+# goes first; evidence/02b/benchmark.md reads the runs together.
+
+on:
+  workflow_dispatch:
+    inputs:
+      first:
+        description: Which app is loaded first
+        type: choice
+        options: [old-app, new-service]
+        default: old-app
+
+permissions:
+  contents: read
+  actions: read # download this run's service-win-x64 artifact
+
+env:
+  GALLERY_SHA: 63e6ee4202b441e1c904d6f78fc7b070f36bc24f
+  GH_TOKEN: ${{ github.token }} # get-snapshot.ps1 reads the snapshots-v1 release
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  K6_VERSION: v2.4.0
+  K6_SHA256: aaa90b3afc336faf90172c7addf45c4f41305f6f188e3d564f79466e80ac68e3 # k6-v2.4.0-windows-amd64.zip, from the release's checksums file
+
+jobs:
+  # As in live-parity.yml: the gallery build on the Windows runner parks every .NET SDK above 9, so
+  # the service is published here as a self-contained win-x64 build.
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          global-json-file: service/global.json
+      - name: Publish (from service/, so service/global.json picks the SDK)
+        working-directory: service
+        run: dotnet publish src/GalleryReadService -c Release -r win-x64 --self-contained -o "$RUNNER_TEMP/service"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: service-win-x64
+          path: ${{ runner.temp }}/service
+          if-no-files-found: error
+
+  benchmark:
+    needs: publish
+    runs-on: windows-2022
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Build the gallery, or restore it from cache
+        uses: ./.github/actions/gallery-build
+        with:
+          gallery-sha: ${{ env.GALLERY_SHA }}
+
+      - name: Setup (gallery tools\Setup-DevEnvironment.ps1)
+        run: .\scripts\runner\setup.ps1
+
+      - name: Download the seed snapshot and check its digest
+        run: .\scripts\runner\get-snapshot.ps1 -State a -Dir snapshot
+
+      - name: Download the service
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: service-win-x64
+          path: ${{ runner.temp }}\service
+
+      - name: Download k6 and check its SHA-256
+        run: |
+          $zip = "$env:RUNNER_TEMP\k6.zip"
+          Invoke-WebRequest "https://github.com/grafana/k6/releases/download/$env:K6_VERSION/k6-$env:K6_VERSION-windows-amd64.zip" -OutFile $zip -UseBasicParsing
+          $sha = (Get-FileHash $zip -Algorithm SHA256).Hash
+          if ($sha -ne $env:K6_SHA256) { throw "k6 $env:K6_VERSION has SHA-256 $sha" }
+          Expand-Archive $zip "$env:RUNNER_TEMP\k6"
+
+      # The service logs warnings only here: at its default level it writes a line per request and
+      # per query to a redirected console, which would load the machine during the measurement.
+      - name: Restore state A and start the old app and the service
+        run: |
+          .\scripts\runner\reset.ps1 -Dir snapshot
+          .\scripts\runner\start-service.ps1 -ServiceDir "$env:RUNNER_TEMP\service" -Arguments '--Logging:LogLevel:Default=Warning'
+
+      - name: Benchmark (never fails on speed)
+        run: .\scripts\runner\benchmark.ps1 -K6 "$env:RUNNER_TEMP\k6\k6-$env:K6_VERSION-windows-amd64\k6.exe" -First ${{ inputs.first }}
+
+      - name: Stop IIS Express and the service
+        if: always()
+        run: |
+          .\scripts\runner\stop-site.ps1
+          Get-Process GalleryReadService -ErrorAction SilentlyContinue | Stop-Process -Force
+
+      - name: Secret scan of the outputs
+        id: scan
+        if: always()
+        run: .\scripts\runner\secret-scan.ps1 -Dir out
+
+      - name: Upload outputs
+        if: always() && steps.scan.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: benchmark
+          path: out/
+          if-no-files-found: warn
