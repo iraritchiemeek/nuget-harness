@@ -217,7 +217,7 @@ jobs:
         run: |
           .\scripts\runner\reset.ps1 -Dir snapshot
           .\scripts\runner\capture.ps1 -Dir out\responses\restored
-          .\scripts\runner\compare.ps1 -Before first-job\responses\seeded -After out\responses\restored -N 5 -Name 'snapshot restores byte-identically on a fresh machine' -OutName check5-fresh-machine.txt
+          .\scripts\runner\compare.ps1 -Before first-job\responses\seeded -After out\responses\restored -CheckNumber 5 -Name 'snapshot restores byte-identically on a fresh machine' -OutName check5-fresh-machine.txt
           .\scripts\runner\check.ps1 -Dir out\responses\restored
 
       - name: Diagnostics

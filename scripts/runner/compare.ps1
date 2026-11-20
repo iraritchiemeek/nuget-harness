@@ -2,7 +2,7 @@
 # and the change in between really did alter at least one response.
 # Without -Changed (e.g. restoring the snapshot onto a fresh machine) only the byte comparison is made.
 param([Parameter(Mandatory)] [string]$Before, [string]$Changed, [Parameter(Mandatory)] [string]$After,
-      [int]$N = 5, [string]$Name = 'reset is exact', [string]$OutName = 'check5-reset.txt')
+      [int]$CheckNumber = 5, [string]$Name = 'reset is exact', [string]$OutName = 'check5-reset.txt')
 . "$PSScriptRoot\common.ps1"
 $checkDir = Join-Path $OutDir 'checks'
 New-Item -ItemType Directory -Force -Path $checkDir | Out-Null
@@ -25,6 +25,6 @@ $lines = @("files: $($names.Count)", "changed by mutation: $diffChanged", "diffe
 $lines | Set-Content (Join-Path $checkDir $OutName) -Encoding utf8
 $ok = ($diffAfter -eq 0) -and ($names.Count -gt 0) -and ((-not $Changed) -or ($diffChanged -gt 0))
 $detail = "$($names.Count - $diffAfter)/$($names.Count) responses byte-identical after reset" + $(if ($Changed) { "; the mutation changed $diffChanged" } else { '' }) + " ($OutName)"
-Write-Result $N $Name $ok $detail
+Write-Result $CheckNumber $Name $ok $detail
 Write-Summary "- $Name`: $(if ($ok) {'pass'} else {'FAIL'}) - $detail"
 if (-not $ok) { throw 'reset check failed' }
