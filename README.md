@@ -12,7 +12,8 @@ The legacy app is [NuGetGallery](https://github.com/NuGet/NuGetGallery), the ASP
 |---|---|---|---|
 | Recordings | Linux runner | The new service, reading a restored copy of the seeded database, gives the recorded answers | Every push |
 | Live parity | Windows runner | The old app and the new service, side by side on one live database, give identical answers, including after the data changes | By hand, at milestones |
-| Recording run | Windows runner | The recordings themselves are correct and stable | When the request set changes |
+| Recording run | Windows runner | The recordings themselves are correct and stable | When a recording input changes |
+| Benchmark | Windows runner | Speed and database cost of both apps, under the same load on one machine; it measures and never fails on speed | By hand |
 
 The flow:
 
@@ -20,17 +21,21 @@ The flow:
 record.yml       old app on Windows, seed snapshot restored, every request in recordings/requests.txt sent twice
   record job       both passes byte-identical, in two data states -> artifact "recording" (+ state B snapshot)
   commit job       artifact checked again -> release recordings-<run id>; recordings/ + manifest committed by the bot
-new-service.yml  on every push, on Linux, SQL Server in Docker restored from the snapshot
+new-service.yml  on every push, and when record.yml finishes on main; on Linux, SQL Server in Docker restored from the snapshot
+  inputs           a push that changes a recording input skips the checks and waits for the re-record
   verify           recordings/ is byte for byte the release asset of the successful record.yml run the manifest names
   capture          every recorded request sent to the new service
-  compare          every record identical, or status-only / excluded as listed in recordings/parity-exclusions.txt
+  compare          every record identical, or status-only / excluded as listed in recordings/parity-exclusions.txt;
+                   an approved difference (recordings/approved-differences.json) only reorders the recorded body,
+                   which is then still compared byte for byte
 live-parity.yml  old app and new service side by side on Windows, same requests plus new data and new requests
+benchmark.yml    old app and new service in turn under the same k6 load, both over HTTPS -> evidence/02b/benchmark.md
 ```
 
 ## Where to look
 
-- Specs: [`specs/01-old-app-running.md`](specs/01-old-app-running.md), [`specs/02-new-service-read-endpoints.md`](specs/02-new-service-read-endpoints.md) (with its amendments), and the next step, [`specs/02b-improve-behind-the-safety-net.md`](specs/02b-improve-behind-the-safety-net.md).
-- Evidence: [`evidence/01/run-log.md`](evidence/01/run-log.md), [`evidence/02/parity-report.md`](evidence/02/parity-report.md) (every check with the run that produced it), [`evidence/02/run-log.md`](evidence/02/run-log.md), [`evidence/02/reviews.md`](evidence/02/reviews.md).
+- Specs: [`specs/01-old-app-running.md`](specs/01-old-app-running.md), [`specs/02-new-service-read-endpoints.md`](specs/02-new-service-read-endpoints.md) (with its amendments), and [`specs/02b-improve-behind-the-safety-net.md`](specs/02b-improve-behind-the-safety-net.md) (done: SemVer-ordered versions as an approved difference, a defined most-downloaded tie-break, EF Core LINQ queries, and a benchmark).
+- Evidence: [`evidence/01/run-log.md`](evidence/01/run-log.md), [`evidence/02/parity-report.md`](evidence/02/parity-report.md) (every check with the run that produced it), [`evidence/02/run-log.md`](evidence/02/run-log.md), [`evidence/02/reviews.md`](evidence/02/reviews.md), [`evidence/02b/run-log.md`](evidence/02b/run-log.md), [`evidence/02b/benchmark.md`](evidence/02b/benchmark.md).
 - The bar the code is held to: [`docs/engineering-standards.md`](docs/engineering-standards.md).
 
 ## Verify it yourself
