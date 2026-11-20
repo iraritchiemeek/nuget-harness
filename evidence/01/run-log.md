@@ -119,3 +119,21 @@ None. The app runs on its shipped `Web.config`, `flags.json` and `global.json`. 
 Runs used in this session: 15. Eleven failed while iterating, and four were green (11, 12, 14, 15).
 
 Latest green run: https://github.com/iraritchiemeek/nuget-harness/actions/runs/44653627352 (cold build, both jobs).
+
+## 2026-11-20 (UTC): session 3, post-cleanup
+
+Three harness changes, each its own commit, made before spec 02 added workflow steps:
+- `186c4c7` removes the AWS attempt. Its logs move to `evidence/01/aws-attempt/`, and account-scoped IDs are redacted in this log and in those logs. The IDs remain in the git history before that commit.
+- `e094de4` adds `.github/actions/gallery-build` (SDK parking, gallery checkout, build cache with its paths and key defined once, build on a miss) and moves shared script helpers into `common.ps1`. `restore-on-fresh-machine` now honours `skip_build_cache` too. Each job still checks out this repo itself, because a local action can only run once the repo is on disk.
+- `cb9c1b5` adds the `lint` workflow (PSScriptAnalyzer 1.25.0, ruff 0.17.6, actionlint 1.7.12 by digest) and fixes every finding.
+
+| Run | Result | Wall time | What it showed |
+|---|---|---|---|
+| [16](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44657878210) | **pass** | 5:47 | After the AWS removal. |
+| [17](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44659613579) | **pass** | 5:36 | After the composite action and `common.ps1` refactor. Both jobs green. |
+| [18](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44660369277) | **pass** | 6:10 | After the lint fixes (function renames). Both jobs green. |
+| [19](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44660388640) | **pass** | 12:37 | `workflow_dispatch` with `skip_build_cache=true` on the same commit. Both jobs built the gallery from source, so the restore job now honours the input. |
+
+Spec 02 then changed the shared capture format, which spec 01's checks also use (records with status and headers, `evidence/02/run-log.md`):
+- Run [20](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44660814699) failed check 5. With headers compared, the responses captured straight after `reset.ps1` restarted the app carried `Cache-Control: No-Cache`, and the seeded capture had `private`.
+- `start-site.ps1` now waits for that state to pass. Run [21](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44661804876) passed both jobs (6:15).
