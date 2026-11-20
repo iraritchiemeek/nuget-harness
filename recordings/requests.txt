@@ -17,6 +17,8 @@
 #   line numbers of the machine that built the gallery. That is not a response a service can or should reproduce.
 # - path characters in requestPathInvalidCharacters (< > * % : \ ?) and encoded slashes. ASP.NET and IIS reject them
 #   before the app runs, and answer local clients with a detailed error page that includes the server's file paths.
+# - a path that matches neither route, such as /api/v2/package-versions/Serilog/extra. It never reaches these two
+#   endpoints, so it is not the new service's to answer; the proxy in the next spec sends it to the old app.
 
 # Seeded prefixes, one per line of seed/prefixes.txt (spec 01 check 1). Source: AutocompleteDatabasePackageIdsQuery.cs
 GET /api/v2/package-ids?partialId=Serilog
@@ -296,7 +298,6 @@ GET /api/v2/package-versions/Serilog-Sinks-Console
 GET /api/v2/package-versions/Seri%6Cog
 GET /api/v2/package-versions/Serilog.
 GET /api/v2/package-versions/Serilog%20
-GET /api/v2/package-versions/Serilog/extra
 
 # Methods other than GET. Source: [HttpGet] on both actions in ApiController.cs; the routes in Routes.cs accept any method
 POST /api/v2/package-ids?partialId=Serilog

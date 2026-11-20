@@ -28,8 +28,25 @@ while ((Get-Date) -lt $deadline) {
     Write-Host "$(Get-Date -Format o) probe status $($r.Status)"
     if ($r.Status -eq 200) {
         Write-Summary "- start: app answered GET /api/v2/package-ids?partialId=a with 200: ``$(Get-Content $probe -Raw)``"
-        return
+        break
     }
     Start-Sleep -Seconds 10
 }
-throw "App did not answer 200 within $TimeoutSeconds s"
+if ($r.Status -ne 200) { throw "App did not answer 200 within $TimeoutSeconds s" }
+
+# For a while after it first answers, the app sends Cache-Control: No-Cache; after that, private
+# (record run 44660814724: the first 36 responses of a pass that began straight after a start).
+# The cause is not identified. IIS Express also starts the applicationInitialization requests from
+# Web.config (/ and /api/health-probe) at that point. Wait for the steady state, so that every
+# capture sees the app the same way, and fail if it does not arrive.
+$headers = Join-Path $OutDir 'start-probe-headers.txt'
+$sw = [Diagnostics.Stopwatch]::StartNew(); $probes = 0
+do {
+    $probes++
+    $r = Invoke-Curl -Path '/api/v2/package-ids?partialId=a' -OutFile $probe -Extra @('-D', $headers)
+    $cache = @(Get-Content $headers | Where-Object { $_ -match '^Cache-Control:\s*(.*)$' } | ForEach-Object { $Matches[1].Trim() })
+    if ($r.Status -eq 200 -and $cache -notcontains 'No-Cache') { break }
+    Start-Sleep -Milliseconds 500
+} while ($sw.Elapsed.TotalSeconds -lt $TimeoutSeconds)
+if ($r.Status -ne 200 -or $cache -contains 'No-Cache') { throw "app still answering with Cache-Control: No-Cache after $probes probes" }
+Write-Summary "- start: steady state (Cache-Control: $($cache -join ', ')) after $probes probes, $([math]::Round($sw.Elapsed.TotalSeconds, 1)) s"

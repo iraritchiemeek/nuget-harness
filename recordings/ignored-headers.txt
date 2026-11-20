@@ -1,3 +1,7 @@
 # Response headers that are not compared, one per line: the header name, then the reason.
 # Every other header the old app sends is recorded and compared byte for byte.
 date  The time the response was sent; differs on every request.
+server  Names the web server software (Microsoft-IIS/10.0, Kestrel); a property of the host, not of the response.
+x-sourcefiles  Sent by IIS Express, a development server, to local clients: the request's physical path on the machine running the old app, base64-encoded.
+content-length  Message framing. IIS sends Content-Length, Kestrel may send Transfer-Encoding: chunked; the body itself is compared byte for byte.
+transfer-encoding  Message framing, as content-length.

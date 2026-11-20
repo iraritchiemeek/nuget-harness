@@ -34,9 +34,10 @@ foreach ($line in $lines) {
     $name = Get-RecordName $line
     $body = Join-Path $Dir "$name.body"
     # --path-as-is and -g send the path exactly as written (no dot-segment squashing, no globbing).
-    # POST carries an empty body and says so with Content-Length: 0, as an HTTP client would.
+    # POST and PUT carry an empty body and say so with Content-Length: 0, as an HTTP client would.
+    # Without it, http.sys answers PUT with 411 Length Required before the app sees the request.
     $extra = @('--path-as-is', '-g', '-X', $method, '-D', $headerFile)
-    if ($method -eq 'POST') { $extra += @('-H', 'Content-Length: 0') }
+    if ($method -in 'POST', 'PUT') { $extra += @('-H', 'Content-Length: 0') }
     $r = Invoke-Curl -Path "$Server$path" -OutFile $body -Extra $extra
     if (-not (Test-Path $body)) { New-Item -ItemType File -Path $body | Out-Null }   # curl writes no file for an empty body
 
