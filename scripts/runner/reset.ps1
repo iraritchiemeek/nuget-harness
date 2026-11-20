@@ -21,6 +21,7 @@ foreach ($db in 'NuGetGallery', 'SupportRequest') {
 $files = Join-Path $SiteDir 'App_Data\Files'
 & robocopy (Join-Path $Dir 'Files') $files /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
 if ($LASTEXITCODE -ge 8) { throw "robocopy failed with $LASTEXITCODE" }
+$global:LASTEXITCODE = 0   # robocopy uses 1-7 for success; do not let it become the step exit code
 New-Item -ItemType Directory -Force -Path (Join-Path $OutDir 'seed') | Out-Null
 Copy-Item (Join-Path $Dir 'expected.json') (Join-Path $OutDir 'seed\expected.json') -Force
 Write-Summary "- reset: databases restored and package store replaced from $Dir"

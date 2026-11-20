@@ -13,6 +13,7 @@ foreach ($db in 'NuGetGallery', 'SupportRequest') {
 $files = Join-Path $SiteDir 'App_Data\Files'
 & robocopy $files (Join-Path $Dir 'Files') /MIR /NFL /NDL /NJH /NJS /NP | Out-Null
 if ($LASTEXITCODE -ge 8) { throw "robocopy failed with $LASTEXITCODE" }
+$global:LASTEXITCODE = 0   # robocopy uses 1-7 for success; do not let it become the step exit code
 Copy-Item (Join-Path $OutDir 'seed\expected.json') (Join-Path $Dir 'expected.json')
 $n = (Get-ChildItem (Join-Path $Dir 'Files') -Recurse -File).Count
 Write-Summary "- snapshot: databases backed up, package store copied ($n files)"
