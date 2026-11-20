@@ -1,40 +1,58 @@
 # Spec 02 parity report
 
-Status on 2026-11-20 (UTC), session 5. Every number links to the public run that produced it. The runs are on the current recording (record run [44670190089](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44670190089)) and the current code (commit `5ef37ec`), except where a row says otherwise.
+Status on 2026-11-20 (UTC), session 6 (the review-fix pass). Every number links to the public run that produced it. The runs are on the current recording (record run [44678822763](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44678822763)) and the current code (commit `69d72bc`), except where a row says otherwise. Session 5's report, on 295 requests, is in this file's history.
 
-**Summary.** All eight checks pass in both data states. Of the 295 recorded requests, 290 are compared byte for byte. Three are excluded and two are compared by status only. Each of the five is listed below with its reason.
+**The three runs to open first:** record [44678822763](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44678822763), new-service [44680388263](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44680388263) and live-parity [44680388674](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44680388674).
+
+**Summary.** All eight checks pass in both data states. Of the 351 recorded requests, 312 are compared byte for byte, 36 by status only, and 3 are excluded. Every exclusion entry names its amendment, and CI checks the amendment's condition against the old app's record. Three requests are known not to be covered; see "Known gaps".
 
 | # | Check | Result | Runs |
 |---|---|---|---|
-| 1 | Recordings trustworthy | pass: 295 requests in each of two states, two byte-identical passes per state (295/295 each); manifest with run, app commit, both snapshot digests, the state-B list hash, the exclusions file hash and 1,185 file hashes | record [44670190089](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44670190089) |
-| 2 | Request set covers the awkward cases | pass as recorded: 295 requests, each group citing its old-app source; A3 groups (blank IDs, LIKE characters); state B makes the flag requests matter | same run |
-| 3 | Service matches the recordings on Linux | pass in both states: 292/292 compared records identical, 2 of them by status only; 3 excluded | new-service [44671063641](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44671063641) |
-| 4 | Answers from the database | pass: no recording in the publish output or the container image; after `mutate.sql`, 9/9 affected responses changed as the data says | same run, job `mutation` |
-| 5 | Comparator can fail | pass: one planted wrong row; `compare.ps1` failed and reported exactly `GET /api/v2/package-versions/log4net` | same run, job `negative-control` |
-| 6 | Live parity on Windows | pass: state A 292/292, state B 292/292 (2 of them by status only; 3 excluded); after the extra pushes, 327/327 requests outside the committed set identical | live-parity [44671299999](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44671299999) |
-| 7 | Writes nothing | pass in both states: login `reader` has `db_datareader` only; 52 fingerprint lines (row count and checksum of every table, SHA-256 of `Packages` and `PackageRegistrations`) identical before and after the 295 requests | new-service [44671063641](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44671063641) |
-| 8 | Quality gates on every push | pass: locked restore with audit (0 vulnerable packages), build with analyzers and warnings as errors, CSharpier, `dotnet format` style and analyzers, 45 unit/property tests, 26 integration tests (Testcontainers SQL Server), Stryker 90.91% (break 80), CodeQL, lint; old app's source and config diff empty | service-quality [44671063765](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44671063765), codeql [44671063554](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44671063554), lint [44671063449](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44671063449), old-app [44671063570](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44671063570) (job `restore-on-fresh-machine` passed on its second attempt; see the run log on the LocalDB start flake) |
+| 1 | Recordings trustworthy | pass: 351 requests in each of two states, two byte-identical passes per state (351/351 each). The manifest holds the run, the app commit, both snapshot digests, the state B list hash, the exclusions file hash and 1,409 file hashes. On every later run, `verify-recordings.ps1` checks that `recordings/` is, file for file, the asset of the release `recordings-44678822763`, and that the run is a successful `record.yml` run on `main` | record [44678822763](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44678822763) |
+| 2 | Request set covers the awkward cases | **The agent's own judgement, not a tool check.** No tool measures coverage. The agent wrote the request set from the old app's source, and each group in `recordings/requests.txt` cites the file it comes from: A3 groups (blank and whitespace IDs, `LIKE` characters), the web server's limits and refusals (A2 review finding), and the flag requests that state B makes matter. The reviewers read it; the gaps they found are recorded in `reviews.md` | same run |
+| 3 | Service matches the recordings on Linux | pass in both states: 348/348 compared records identical, 36 of them by status only; 3 excluded | new-service [44680388263](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44680388263) |
+| 4 | Answers from the database | pass: no recording in the publish output or the container image; after `change-data.sql` and `download-counts.sql`, 11/11 affected responses changed as the data says, including the most-downloaded order | same run, job `data-change` |
+| 5 | Comparator can fail | pass: the service's own answers pass first, then four planted faults each fail on exactly the planted record, for the planted reason: a wrong status on a status-only record, a changed compared header, a deleted record (`MISSING`), a wrong version served from the database | same run, job `negative-control` |
+| 6 | Live parity on Windows | pass: state A 348/348, state B 348/348 (36 of them by status only; 3 excluded); after the extra pushes and distinct download counts, 332/332 requests outside the committed set identical | live-parity [44680388674](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44680388674) |
+| 7 | Writes nothing | pass in both states: login `reader` has `db_datareader` only; 52 fingerprint lines (row count and checksum of every table, SHA-256 of `Packages` and `PackageRegistrations`) identical before and after the 351 requests | new-service [44680388263](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44680388263) |
+| 8 | Quality gates on every push | pass: locked restore with audit, build with analyzers and warnings as errors, CSharpier, `dotnet format` style and analyzers, 78 unit and property tests, 50 integration tests (Testcontainers SQL Server), coverage reported, Stryker 90.82% (break 80), CodeQL, lint; old app's source and config diff empty | service-quality [44680388301](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44680388301), codeql [44680388166](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44680388166), lint [44680388149](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44680388149), old-app [44680388157](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44680388157) |
 
-**The gates block.** Two gates were violated on throwaway branches, each run failed at the gate's own step, and the branches were deleted:
-- CSharpier: `Program.cs` collapsed onto one line. Job `gates` failed at step `CSharpier` ("Program.cs - Was not formatted"). service-quality [44670434468](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44670434468).
+**The gates flag; they don't block.** The workflows run after a commit is pushed to `main`, and `main` has no branch protection, so a failing gate marks a bad commit as red but does not stop it from landing. Making them block is a repository setting (see `run-log.md`, session 6, recommendations), which is the owner's decision. Each gate does fail when it is violated: two were tried on throwaway branches in session 5, and each run failed at the gate's own step:
+- CSharpier: `Program.cs` collapsed onto one line. Job `gates` failed at step `CSharpier`. service-quality [44670434468](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44670434468).
 - Stryker break threshold: five of the seven test files removed. Job `mutation-testing` failed at step `Stryker.NET (break threshold 80)` with a score of 3.03%. service-quality [44670438414](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44670438414).
 
 ## Exclusions
 
-`recordings/parity-exclusions.txt` lists five of the 295 recorded requests. It is hashed in the manifest, so it changes only with a re-record. `compare.ps1` lists every entry in each report, and fails on an unknown mode, on a GET in mode `excluded`, and on an entry that is not a recorded request.
+`recordings/parity-exclusions.txt` lists 39 of the 351 recorded requests. Each entry names its amendment, and `Read-ParityExclusionFile` (`scripts/runner/common.ps1`) checks the amendment's condition against the old app's record in both states, on every comparison and in `verify-recordings.ps1`:
+- `excluded` (A1) is allowed only for a method other than GET.
+- `status-only` (A4) is allowed only where the recorded body is `text/html` and carries the signature of one of three pages the web server writes, not the app: IIS's detailed error page (`<title>IIS 10.0 Detailed Error - 404.x`), ASP.NET's error page (`Server Error in '/' Application` with an `HttpException`), or http.sys's "Bad Request - Invalid URL" page.
 
-| Request | Mode | Reason |
-|---|---|---|
-| `POST /api/v2/package-ids?partialId=Serilog` | excluded | A1: not a GET. The old app answers with ASP.NET's developer-detail 404 page (framework build, stack trace). The next spec's proxy sends it to the old app. The service answers `405` with `Allow: GET`, pinned by `Methods_other_than_GET_are_refused_with_405_and_Allow_GET`. |
-| `DELETE /api/v2/package-versions/Serilog` | excluded | A1, as above |
-| `PUT /api/v2/package-versions/Serilog` | excluded | A1, as above |
-| `GET /api/v2/package-versions/%20` | status-only | A4: the old app's code never sees it. IIS trims the trailing spaces, finds no route and answers `404` with its "404.4" detailed error page, which names the recording machine's paths. Both answer `404`. The service's answer (empty body, no content type, `Cache-Control: private`, `X-Frame-Options: deny`) is pinned by `A_blank_id_is_not_found_with_an_empty_body`. |
-| `GET /api/v2/package-versions/%20%20` | status-only | A4, as above |
+The file is hashed in the manifest, so it changes only with a re-record. Every report lists every entry, so none is silent.
 
-In mode `status-only` only the `status:` lines are compared. The headers and body are not. A missing record or a missing status line fails. In the last run before A4, when the service still answered `500`, the only header differences on these two records were the status and the content type ([44669108406](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44669108406)).
+| Requests | Mode | Old app's status | Reason |
+|---|---|---|---|
+| `POST`, `PUT`, `DELETE` on the two routes (3) | excluded | 404 | A1: not a GET. The old app answers with ASP.NET's developer-detail 404 page. The next spec's proxy sends these to the old app. The service answers `405` with `Allow: GET`, pinned by a test. |
+| Whitespace-only IDs `%20`, `%20%20` (2) | status-only | 404 | A4: IIS trims the spaces and answers with its 404.4 page. |
+| Other paths IIS answers with 404.4 (6) | status-only | 404 | A4: no handler: `%2F` and `%5C` in an ID, IDs of non-ASCII whitespace (`%C2%A0`, `%E3%80%80`), `.` and `.%20`. |
+| `+` in a path (3) | status-only | 404 | A4: IIS 404.11, double escaping. |
+| Query strings over 12,000 characters (4) | status-only | 404 | A4: IIS 404.15, `maxQueryString`. |
+| `requestPathInvalidCharacters` in a path (8) | status-only | 400 | A4: ASP.NET's "potentially dangerous Request.Path". |
+| Paths over `maxUrlLength` (2) | status-only | 400 | A4: ASP.NET's error page. |
+| Control characters, and path segments over 260 characters (11) | status-only | 400 | A4: http.sys's "Bad Request - Invalid URL". |
+
+In mode `status-only` only the `status:` lines are compared, and a missing record or status line fails. The service gives each of these statuses in one place, `HostingRules.cs`, with its source and a test.
+
+## Known gaps
+
+**Request-validation errors are not covered: 3 requests.** `partialId=%3Cx`, `partialId=%26%23x` and `semVerLevel=%3Cx` are not in the recorded set. They are listed in the "Not sent" block of `recordings/requests.txt`.
+- **Why:** the old app answers 500, and its own code writes the body: `ApiController.OnException` (line 1045 at the pinned commit) catches the request-validation exception. What it writes depends on whether the client is local. A local client, which the recorder is, gets the exception's stack trace; a remote client gets `exception.Message`. Neither A1 nor A4 covers a body the app writes, and recording the local-client body would pin the service to a stack trace no production client sees (exploratory record run [44674677772](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44674677772)).
+- **How to close it:** record these requests from a non-local client, so the recorded body is the message a real client gets.
+
+**State B is narrower than state A.** It adds seven real nuget.org versions. Five are new versions of seeded IDs, which change `package-versions` answers and the flag requests. Two are new IDs under `Serilog.Sinks`, which change 20 `package-ids` answers in state B. State B adds no new prefix, no unlisted package and no deleted package. The live extra phase (check 6) goes further, with seven more pushes, distinct download counts and 332 requests outside the committed set, but it is compared live, not recorded.
 
 ## Where the counts come from
 
-- Recorded set: `recordings/requests.txt`, 295 requests. Records: `recordings/state-a`, `recordings/state-b`. Exclusions: `recordings/parity-exclusions.txt`.
-- State B: `seed/state-b.txt`, five real nuget.org versions of seeded IDs: SemVer 1 prerelease, dotted prerelease (two), stable with `+` metadata, dotted prerelease with `+` metadata.
-- Live extra phase: `seed/live-parity-extra.txt` (seven pushes: new IDs with `-` and `_`, a prerelease-only SemVer 2 ID, another `+` version), `scripts/live-parity-requests.txt` (27 fixed requests) and 300 requests from `random-requests.ps1` seeded with the run ID.
+- Recorded set: `recordings/requests.txt`, 351 requests. Records: `recordings/state-a`, `recordings/state-b`. Exclusions: `recordings/parity-exclusions.txt`, 39 entries.
+- State B: `seed/state-b.txt`, seven real nuget.org versions: a SemVer 1 prerelease, two dotted prereleases, a stable version with `+` metadata, a dotted prerelease with `+` metadata (all of seeded IDs), and two new IDs, one stable and one whose only version is a prerelease.
+- Download counts: `scripts/download-counts.sql`, 32 distinct counts.
+- Live extra phase: `seed/live-parity-extra.txt` (seven pushes: new IDs with `-` and `_`, a prerelease-only SemVer 2 ID, another `+` version), `scripts/live-parity-requests.txt` (32 fixed requests) and 300 requests from `random-requests.ps1` seeded with the run ID.

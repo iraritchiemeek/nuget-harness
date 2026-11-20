@@ -211,3 +211,53 @@ Work by a Claude Code agent session (session 5), after the human added amendment
 - **Report format kept.** `negative-control.ps1` matches `DIFFERENT  <record>  <request>` exactly, so new lines follow the old two-space layout.
 
 Session 5 total: 16 workflow runs before the evidence commits (17 attempts with the rerun): the table above, plus codeql [44671063554](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44671063554) and lint [44671063449](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44671063449) on the final code, both passed. Each evidence commit also ran lint, which passed.
+
+## 2026-11-20 (UTC): session 6, the review-fix pass
+
+Work by Claude Code agent sessions, after three independent reviewer agents read commit `c355399`. Each finding, its resolution and the commit or run that resolved it: `evidence/02/reviews.md`. Final counts per check: `evidence/02/parity-report.md`.
+
+**Names changed in this pass** (earlier entries in this log keep the old names): the `mutation` job in `new-service.yml` is now `data-change`, `mutate.sql` is `change-data.sql`, `mutate.ps1` is `push-extra.ps1`, and `mutation-check.ps1` is `data-change-check.ps1`. "Mutation" now means Stryker only.
+
+### What changed
+
+- **Recording.** `record.yml` is two jobs: a read-only `record` job, and a `commit` job with `contents: write`. The commit job keeps the recordings folder as the asset of the release `recordings-<run id>` before it pushes. `verify-recordings.ps1` compares `recordings/` with that asset, so verification no longer depends on a workflow artifact, which expires after 90 days.
+- **Exclusions.** Each entry names its amendment, and CI checks the amendment's condition against the old app's record.
+- **Request set.** It grew from 295 to 351 requests, adding the web server's refusals and limits, and state B grew from five pushes to seven. The re-record ([44678822763](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44678822763)) left every one of the 295 existing state-A records byte for byte unchanged and added 56. In state B, 20 `package-ids` answers changed, all because of the two new IDs.
+- **Not recorded: request validation.** Three requests are a known gap (`parity-report.md`, "Known gaps"). The old app's own `ApiController.OnException` writes their 500 body, so amendment A4 does not cover them.
+- **Kestrel limits.** `docs/engineering-standards.md` now says Kestrel's limits match the old app's (IIS `maxQueryString` and similar), not "defaults or tighter". Parity needs the service to accept and refuse the same requests.
+
+### Runs
+
+| Run | Workflow | Result | What happened | Change that followed |
+|---|---|---|---|---|
+| [44674677772](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44674677772) | record (branch `probe-a2`, no commit) | fail, exploration | Check 1 failed only on `/api/v2/package-versions/..`, which differs between passes. Gave the statuses and error pages of the new requests, and showed that request validation's 500 body is written by the app. | Dropped `..` (it resolves to another route); request-validation values left out |
+| [44677460758](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44677460758) | record (`probe-a2`, no commit) | fail | State A passed. The state B push stopped at the co-ownership count: the two new IDs have no registration yet. | 60640af: grant only on IDs that exist |
+| [44678323085](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44678323085) | record (`probe-a2`, no commit) | pass | 351/351 identical passes in both states; seven pushes, two of them new IDs. | Pushed `main` |
+| [44678822763](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44678822763) | record | **pass** | The current recording. The commit job created release `recordings-44678822763` and committed 8e498db. | |
+| [44678823125](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44678823125) | new-service | fail, expected | Ran on the push itself, before the re-record. The committed manifest still named run 44670190089, which has no release, so `verify-recordings.ps1` could not download one. This red window lasts until the bot's commit; bot pushes start no workflows, so the next runs were started by hand. | None needed |
+| [44678823088](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44678823088), [44678823007](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44678823007), [44678822830](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44678822830), [44678822824](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44678822824) | old-app, lint, codeql, service-quality | pass | The same push. | |
+| [44679454144](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44679454144) | new-service | fail (check 5 only) | Checks 3, 4 and 7 passed in both states. Check 5's deleted-record case found that `compare.ps1` crashed on a record missing from one side (`@()` unrolls to `$null` under strict mode) instead of reporting `MISSING`. | 6348baa |
+| [44679458066](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44679458066) | live-parity | fail (extra phase) | States A and B passed. Then the extra phase counted the rows `download-counts.sql` set as 1, because `Invoke-Sql` returns one array and `@()` wrapped it. | 69d72bc |
+| [44680388263](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44680388263) | new-service | **pass** | Checks 3, 4, 5 and 7 in both states, on 69d72bc. | |
+| [44680388674](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44680388674) | live-parity | **pass** | Check 6: 348/348 in both states, extra 332/332. | |
+| [44680388301](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44680388301), [44680388166](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44680388166), [44680388149](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44680388149), [44680388157](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44680388157) | service-quality, codeql, lint, old-app | **pass** | 69d72bc: 78 unit and 50 integration tests, Stryker 90.82%. | |
+
+Session 6 total: 17 workflow runs before the evidence commit, none rerun. Pushing `.github/dependabot.yml` also started Dependabot: 6 "Dependabot Updates" runs and 9 update pull requests, all left open for the owner. One of them (NuGet.Versioning 8.0.0) would break parity; 6869372 tells Dependabot to leave that package alone.
+
+**The LocalDB start flake (review C9).** `setup.ps1` now starts LocalDB itself before the gallery's setup, with up to five attempts, each logged. In this pass it started LocalDB 9 times, in every Windows job from probe 2 on, and every start answered on the first attempt. That is 0 retries in 9 starts, against 2 failures in 22 attempts before the wrapper.
+
+### Decisions
+
+- **Recordings kept in a release, not checked against the artifact.** The owner decided this. If GitHub ever answers 404 for the run, verification rests on the release asset and the manifest hashes, and says so. Any other error reading the run fails. A re-run of a recording run must find the same recording in its release; the release is never overwritten.
+- **Signal, not control.** A release asset can be replaced by anyone who can push, while a run artifact cannot. The check binds the folder to the asset, and the asset's name to a successful run, but not the asset's bytes to that run. The "immutable releases" recommendation below would close this.
+- **Request validation is a known gap**, not an amendment (owner's decision). Recording from a non-local client would close it.
+- **No `docker` Dependabot entry, folders not renamed, README heading "Verify it yourself".** The reasons are in `reviews.md` (B4, C7, C1).
+
+### Recommended repository settings (review B7, not applied)
+
+Repository settings are the owner's decision; none of these was changed.
+- **A ruleset on `main`** requiring the new-service, service-quality, codeql, lint and old-app checks to pass before a change lands. The gates would then block instead of flag. The recording workflow's commit job pushes to `main`, so it would need a bypass, or would have to open a pull request instead.
+- **Immutable releases.** Once published, a release's assets and tag could not be changed, so `recordings-<run id>` would become as strong as a run artifact. The commit job currently adds the state B snapshot to the existing `snapshots-v1` release, which immutable releases would refuse. It would first have to put that snapshot in the run's own release.
+- **A tag ruleset** on `recordings-*` and `snapshots-*` that blocks deleting or moving those tags.
+- **Actions settings:** require actions to be pinned to a full-length commit SHA (every workflow already is), allow only GitHub-owned and listed actions, and keep the default `GITHUB_TOKEN` permission read-only.
+- **Secret scanning with push protection, and Dependabot alerts.**
