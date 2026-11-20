@@ -25,7 +25,7 @@ on:
         default: true
   push:
     branches: [main]
-    paths: ['recordings/requests.txt', 'recordings/ignored-headers.txt', 'recordings/parity-exclusions.txt', 'seed/state-b.txt']
+    paths: ['recordings/requests.txt', 'recordings/ignored-headers.txt', 'recordings/parity-exclusions.txt', 'recordings/approved-differences.json', 'seed/state-b.txt']
 
 permissions:
   contents: read
@@ -163,7 +163,7 @@ jobs:
         run: |
           . ./scripts/runner/common.ps1
           $art = "$env:RUNNER_TEMP/recording"
-          foreach ($name in 'requests.txt', 'ignored-headers.txt', 'parity-exclusions.txt') {
+          foreach ($name in 'requests.txt', 'ignored-headers.txt', 'parity-exclusions.txt', 'approved-differences.json') {
             if ((Get-FileHash "$art/$name").Hash -ne (Get-FileHash "recordings/$name").Hash) { throw "the recording was made from a different recordings/$name than this commit's" }
           }
           Remove-Item recordings/state-a, recordings/state-b -Recurse -Force -ErrorAction SilentlyContinue

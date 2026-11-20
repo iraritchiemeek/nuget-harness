@@ -1,5 +1,5 @@
 # Assemble a recording in -Out, laid out as recordings/ is in the repository: the request set,
-# ignored headers and parity exclusions this run used (from recordings/ in the checkout), the
+# ignored headers, parity exclusions and approved differences this run used (from recordings/ in the checkout), the
 # verified records of both data states in state-a and state-b, and manifest.json. The manifest says
 # where the recording came from (run, app commit, the two snapshots, the state B push list) and
 # holds the SHA-256 of every other file. verify-recordings.ps1 checks all of it on every run.
@@ -11,7 +11,7 @@ $inputs = Join-Path $RepoRoot 'recordings'
 if (Test-Path $Out) { Remove-Item $Out -Recurse -Force }
 New-Item -ItemType Directory -Path $Out | Out-Null
 $Out = (Resolve-Path $Out).Path
-foreach ($name in 'requests.txt', 'ignored-headers.txt', 'parity-exclusions.txt') { Copy-Item (Join-Path $inputs $name) $Out }
+foreach ($name in 'requests.txt', 'ignored-headers.txt', 'parity-exclusions.txt', 'approved-differences.json') { Copy-Item (Join-Path $inputs $name) $Out }
 foreach ($state in @(@{ Name = 'state-a'; From = $StateA }, @{ Name = 'state-b'; From = $StateB })) {
     $to = Join-Path $Out $state.Name
     New-Item -ItemType Directory -Path $to | Out-Null

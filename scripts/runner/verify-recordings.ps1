@@ -3,7 +3,10 @@
 #   1. Every file listed in manifest.json has the listed SHA-256, and no file is missing or extra.
 #   2. seed/state-b.txt is the push list state B was made with.
 #   3. Every ignored header has a reason, and every parity exclusion meets the condition of its
-#      amendment in both states (Read-ParityExclusionFile in common.ps1).
+#      amendment in both states (Read-ParityExclusionFile in common.ps1). Every approved difference
+#      (spec 02b) is well formed (Read-ApprovedDifferenceFile), applies to at least one record in
+#      each state, shares no record with another rule, and its transform applies to every record
+#      it covers (Get-ApprovedBody).
 #   4. Provenance. The state B snapshot comes from the run named in the manifest. That run's commit
 #      job kept the recording as the asset of the GitHub Release recordings-<run id>, because workflow
 #      artifacts expire; the asset is, file for file, the folder being checked, manifest.json included.
@@ -53,6 +56,23 @@ foreach ($state in 'state-a', 'state-b') {
     try { $null = Read-ParityExclusionFile -File (Join-Path $rec 'parity-exclusions.txt') -Recorded (Join-Path $rec $state) }
     catch { $problems += "parity exclusions, ${state}: $_" }
 }
+try {
+    $rules = @(Read-ApprovedDifferenceFile (Join-Path $rec 'approved-differences.json'))
+    foreach ($state in 'state-a', 'state-b') {
+        $applied = @{}
+        foreach ($meta in Get-ChildItem (Join-Path $rec $state) -Filter '*.meta') {
+            try {
+                $rule = Get-ApprovedDifference $rules @(Get-Content $meta.FullName)
+                if (-not $rule) { continue }
+                $null = Get-ApprovedBody $rule ([IO.Path]::ChangeExtension($meta.FullName, '.body'))
+                $applied[$rule.name] = 1 + $(if ($applied.ContainsKey($rule.name)) { $applied[$rule.name] } else { 0 })
+            } catch { $problems += "approved differences, ${state}, $($meta.Name): $_" }
+        }
+        foreach ($rule in $rules | Where-Object { -not $applied.ContainsKey($_.name) }) { $problems += "approved difference '$($rule.name)' applies to no record in $state" }
+        $approvedSummary = @($rules | ForEach-Object { "'$($_.name)' $(if ($applied.ContainsKey($_.name)) { $applied[$_.name] } else { 0 })" }) -join ', '
+        Write-Host "approved differences, ${state}: $approvedSummary records"
+    }
+} catch { $problems += "approved differences: $_" }
 
 # 4. Provenance.
 if ($manifest.run -notmatch '/actions/runs/(\d+)$') { throw "manifest run is not a run URL: $($manifest.run)" }

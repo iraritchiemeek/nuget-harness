@@ -20,7 +20,8 @@ env:
 jobs:
   # Done-when 3 and 7, in both data states (amendment A2): restore the state's snapshot into SQL
   # Server, start the service as the read-only login, send every recorded request, and require
-  # every record to match. The database fingerprint before and after must be identical.
+  # every record to match, after the approved differences (spec 02b). The database fingerprint
+  # before and after must be identical.
   recordings:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -68,7 +69,7 @@ jobs:
         shell: pwsh
         run: >-
           ./scripts/runner/compare.ps1 -Before recordings/state-${{ matrix.state }} -After out/new-service
-          -Exclusions recordings/parity-exclusions.txt -CheckNumber 3
+          -Exclusions recordings/parity-exclusions.txt -ApprovedDifferences recordings/approved-differences.json -CheckNumber 3
           -Name 'state ${{ matrix.state }}: new service matches the recordings' -OutName spec02-check3-state-${{ matrix.state }}.txt
 
       - name: Service log
@@ -155,8 +156,9 @@ jobs:
           path: out/
           if-no-files-found: warn
 
-  # Done-when 5: the comparator can fail, on the path check 3 takes (the recordings and the parity
-  # exclusions). Four planted faults, each of which must be reported alone and for its reason.
+  # Done-when 5: the comparator can fail, on the path check 3 takes (the recordings, the parity
+  # exclusions and the approved differences). Five planted faults, each of which must be reported
+  # alone and for its reason.
   negative-control:
     runs-on: ubuntu-24.04
     timeout-minutes: 20

@@ -10,10 +10,16 @@
 #   excluded     (spec 02 amendment A1) left out of the comparison
 #   status-only  (spec 02 amendment A4) only the status lines must match; the headers and body are
 #                the web server's own error page and are not compared
+# -ApprovedDifferences names the approved differences file (recordings/approved-differences.json,
+# spec 02b), read by Read-ApprovedDifferenceFile in common.ps1. Where a rule applies to a record,
+# the expected body is -Before's body after the rule's transform (Get-ApprovedBody), still compared
+# byte for byte, and the .meta files must still be identical. The report names the rule for every
+# record it applied to.
 # The report is written to out/checks/<OutName>; OutName starts with the spec, as in spec02-check3-state-a.txt.
 param([Parameter(Mandatory)] [string]$Before, [string]$Changed, [Parameter(Mandatory)] [string]$After,
       [Parameter(Mandatory)] [int]$CheckNumber, [Parameter(Mandatory)] [string]$Name,
-      [Parameter(Mandatory)] [ValidatePattern('^spec\d\d-')] [string]$OutName, [string]$Exclusions)
+      [Parameter(Mandatory)] [ValidatePattern('^spec\d\d[a-z]?-')] [string]$OutName, [string]$Exclusions,
+      [string]$ApprovedDifferences)
 . "$PSScriptRoot\common.ps1"
 $checkDir = Join-Path $OutDir 'checks'
 New-Item -ItemType Directory -Force -Path $checkDir | Out-Null
@@ -34,7 +40,9 @@ function Test-SameRecord($x, $y, [string]$Record) {
 # Show a body as text, with control characters escaped and long bodies cut.
 function Format-Body([string]$Path) {
     if (-not (Test-Path $Path)) { return '(missing)' }
-    $text = [IO.File]::ReadAllText($Path)
+    return Format-Text ([IO.File]::ReadAllText($Path))
+}
+function Format-Text([string]$Text) {
     $text = [regex]::Replace($text, '[\x00-\x1f]', { param($m) '\x{0:x2}' -f [int][char]$m.Value })
     if ($text.Length -gt 400) { $text = $text.Substring(0, 400) + " ...($($text.Length) chars)" }
     return $text
@@ -59,6 +67,8 @@ if ($Exclusions) {
         else { $statusOnly[$r] = $e.Request; $report += "STATUS-ONLY  $r  $($e.Request)  ($($e.Reason))" }
     }
 }
+$rules = @(); $approved = 0
+if ($ApprovedDifferences) { $rules = @(Read-ApprovedDifferenceFile $ApprovedDifferences) }
 foreach ($r in $records) {
     if ($excluded.ContainsKey($r)) { continue }
     if ($statusOnly.ContainsKey($r)) {
@@ -72,10 +82,33 @@ foreach ($r in $records) {
         continue
     }
     if ($Changed -and -not (Test-SameRecord $b $c $r)) { $changedCount++ }
-    if (Test-SameRecord $b $a $r) { continue }
-    $differ++
     $bm = @(Read-Meta (Join-Path $Before "$r.meta")); $am = @(Read-Meta (Join-Path $After "$r.meta"))
     $request = if ($bm.Count) { $bm[0] } elseif ($am.Count) { $am[0] } else { $r }
+    $rule = if ($rules.Count) { Get-ApprovedDifference $rules $bm } else { $null }
+    if ($rule -and $am.Count) {
+        $approved++
+        $report += "APPROVED   $r  $request  ($($rule.name))"
+        $expectedText = $null
+        try { $expectedBody = Get-ApprovedBody $rule (Join-Path $Before "$r.body") }
+        catch { $expectedBody = $null; $expectedText = "(the rule cannot apply: $_)" }
+        $actualBody = [IO.File]::ReadAllBytes((Join-Path $After "$r.body"))
+        $sameBody = $null -ne $expectedBody -and [Convert]::ToBase64String($expectedBody) -ceq [Convert]::ToBase64String($actualBody)
+        if ($sameBody -and $b["$r.meta"] -eq $a["$r.meta"]) { continue }
+        $differ++
+        $report += "DIFFERENT  $r  $request  (after approved difference '$($rule.name)')"
+        foreach ($d in Compare-Object $bm $am -CaseSensitive) {
+            $side = if ($d.SideIndicator -eq '<=') { 'expected' } else { 'actual  ' }
+            $report += "    meta $side  $($d.InputObject)"
+        }
+        if (-not $sameBody) {
+            if ($null -eq $expectedText) { $expectedText = Format-Text ([Text.Encoding]::UTF8.GetString($expectedBody)) }
+            $report += "    body expected  $expectedText"
+            $report += "    body actual    $(Format-Body (Join-Path $After "$r.body"))"
+        }
+        continue
+    }
+    if (Test-SameRecord $b $a $r) { continue }
+    $differ++
     if (-not $am.Count -or -not $bm.Count) {
         $report += "MISSING    $r  $request  (only in $(if ($bm.Count) { 'the expected side' } else { 'the actual side' }))"
         continue
@@ -91,13 +124,13 @@ foreach ($r in $records) {
     }
 }
 $compared = $records.Count - $excluded.Count
-$summary = @("records: $($records.Count)", "excluded: $($excluded.Count)", "status only: $($statusOnly.Count)", "different: $differ")
+$summary = @("records: $($records.Count)", "excluded: $($excluded.Count)", "status only: $($statusOnly.Count)", "by approved difference: $approved", "different: $differ")
 if ($Changed) { $summary += "changed by the data change: $changedCount" }
 @($summary + $report) | Set-Content (Join-Path $checkDir $OutName) -Encoding utf8
 $report | Select-Object -First 60 | Write-Host
 
 $ok = ($differ -eq 0) -and ($compared -gt 0) -and ((-not $Changed) -or ($changedCount -gt 0))
-$detail = "$($compared - $differ)/$compared records identical" + $(if ($statusOnly.Count) { " ($($statusOnly.Count) by status only)" } else { '' }) + $(if ($excluded.Count) { ", $($excluded.Count) excluded" } else { '' }) + $(if ($Changed) { "; the data change changed $changedCount" } else { '' }) + " ($OutName)"
+$detail = "$($compared - $differ)/$compared records identical" + $(if ($statusOnly.Count) { " ($($statusOnly.Count) by status only)" } else { '' }) + $(if ($approved) { ", $approved after an approved difference" } else { '' }) + $(if ($excluded.Count) { ", $($excluded.Count) excluded" } else { '' }) + $(if ($Changed) { "; the data change changed $changedCount" } else { '' }) + " ($OutName)"
 Write-Result $CheckNumber $Name $ok $detail
 Write-Summary "- $Name`: $(if ($ok) {'pass'} else {'FAIL'}) - $detail"
 if (-not $ok) { throw "$Name`: failed" }

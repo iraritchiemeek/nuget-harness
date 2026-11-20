@@ -139,6 +139,114 @@ function Read-ParityExclusionFile([string]$File, [string]$Recorded) {
     return $entries
 }
 
+# NuGet version order, oldest first: NuGet.Versioning's VersionComparer.Default, written out here so
+# that the checks do not share code with the service they check. Up to four numeric parts (missing
+# parts are 0), then the release labels: a version without labels is newer than one with them;
+# labels compare one by one, two numbers numerically, a number before text, text ordinally ignoring
+# case; when one list of labels is a prefix of the other, the shorter is older. Build metadata (+...)
+# is ignored. Versions equal in that order (1.0 and 1.0.0) fall back to ordinal order of the text,
+# as in the service (service/src/GalleryReadService/VersionOrder.cs), so the order is total.
+function ConvertTo-NuGetVersionKey([string]$Text) {
+    $m = [regex]::Match($Text, '^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:\.(\d+))?(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$')
+    if (-not $m.Success) { throw "not a NuGet version: $Text" }
+    $parts = [long[]]@(1..4 | ForEach-Object { if ($m.Groups[$_].Success) { [long]$m.Groups[$_].Value } else { 0 } })
+    $labels = [string[]]@(if ($m.Groups[5].Success) { $m.Groups[5].Value.Split('.') })
+    return [pscustomobject]@{ Text = $Text; Parts = $parts; Labels = $labels }
+}
+function Compare-ReleaseLabel([string]$X, [string]$Y) {
+    $nx = 0; $ny = 0
+    $xIsNumber = [int]::TryParse($X, [ref]$nx); $yIsNumber = [int]::TryParse($Y, [ref]$ny)
+    if ($xIsNumber -and $yIsNumber) { return $nx.CompareTo($ny) }
+    if ($xIsNumber) { return -1 }
+    if ($yIsNumber) { return 1 }
+    return [Math]::Sign([StringComparer]::OrdinalIgnoreCase.Compare($X, $Y))
+}
+function Compare-NuGetVersion($X, $Y) {
+    for ($i = 0; $i -lt 4; $i++) {
+        if ($X.Parts[$i] -ne $Y.Parts[$i]) { return $X.Parts[$i].CompareTo($Y.Parts[$i]) }
+    }
+    $xn = $X.Labels.Count; $yn = $Y.Labels.Count
+    if (($xn -eq 0) -ne ($yn -eq 0)) { if ($xn -eq 0) { return 1 } else { return -1 } }
+    for ($i = 0; $i -lt [Math]::Min($xn, $yn); $i++) {
+        $c = Compare-ReleaseLabel $X.Labels[$i] $Y.Labels[$i]
+        if ($c -ne 0) { return $c }
+    }
+    if ($xn -ne $yn) { return $xn.CompareTo($yn) }
+    return [Math]::Sign([string]::CompareOrdinal($X.Text, $Y.Text))
+}
+# Sorts version keys (ConvertTo-NuGetVersionKey) oldest first (Compare-NuGetVersion).
+function Get-SortedNuGetVersionKey([object[]]$Keys) {
+    $list = New-Object 'Collections.Generic.List[object]'
+    foreach ($k in $Keys) { $list.Add($k) }
+    $list.Sort([Comparison[object]] { param($x, $y) Compare-NuGetVersion $x $y })
+    return $list.ToArray()
+}
+# Version strings sorted oldest first.
+function Get-SortedNuGetVersion([string[]]$Versions) {
+    $sorted = Get-SortedNuGetVersionKey @($Versions | ForEach-Object { ConvertTo-NuGetVersionKey $_ })
+    return [string[]]@($sorted | ForEach-Object { $_.Text })
+}
+
+# The approved differences (spec 02b): deliberate differences from the old app, each a named rule in
+# recordings/approved-differences.json. A rule names the bug it fixes, its evidence, the requests it
+# applies to (a regular expression over the request line) and a transform. For a record the rule
+# applies to, the expected body is the old app's body after the transform, and is still compared
+# byte for byte. A rule applies only where the old app answered 200 with JSON.
+# Every transform is a permutation of the elements of a flat JSON array of strings: it reorders the
+# element tokens exactly as the old app wrote them, so it cannot add, drop or change an element.
+#   semver-order   versions sorted oldest first (Get-SortedNuGetVersion)
+$Script:ApprovedTransforms = @('semver-order')
+
+# Read recordings/approved-differences.json and check that every rule is well formed: a unique name,
+# a bug, at least one piece of evidence, a request pattern that compiles, and a known transform.
+# Returns the rules, each with its compiled pattern as .Regex. Throws on any broken rule.
+function Read-ApprovedDifferenceFile([string]$File) {
+    $doc = Get-Content $File -Raw | ConvertFrom-Json
+    $rules = @($doc.rules)
+    if (-not $rules.Count) { throw "$File has no rules" }
+    $names = @{}
+    foreach ($rule in $rules) {
+        foreach ($field in 'name', 'bug', 'evidence', 'requests', 'transform') {
+            if (-not ($rule.PSObject.Properties.Name -ccontains $field) -or -not "$($rule.$field)".Trim()) { throw "approved difference needs a '$field': $($rule | ConvertTo-Json -Compress)" }
+        }
+        if ($names.ContainsKey($rule.name)) { throw "approved difference listed twice: $($rule.name)" }
+        $names[$rule.name] = $true
+        if (-not @($rule.evidence | Where-Object { "$_".Trim() }).Count) { throw "approved difference '$($rule.name)' cites no evidence" }
+        if ($ApprovedTransforms -cnotcontains $rule.transform) { throw "approved difference '$($rule.name)' has an unknown transform '$($rule.transform)'" }
+        try { $regex = New-Object regex $rule.requests } catch { throw "approved difference '$($rule.name)': the request pattern does not compile: $_" }
+        $rule | Add-Member -NotePropertyName Regex -NotePropertyValue $regex
+    }
+    return $rules
+}
+
+# The rule that applies to a record, given its expected (old app) .meta lines, or $null. A record
+# matched by two rules is an error.
+function Get-ApprovedDifference($Rules, [string[]]$Meta) {
+    if (-not $Meta.Count -or $Meta -cnotcontains 'status: 200' -or -not @($Meta | Where-Object { $_ -clike 'content-type: application/json*' }).Count) { return $null }
+    $matched = @($Rules | Where-Object { $_.Regex.IsMatch($Meta[0]) })
+    if ($matched.Count -gt 1) { throw "$($Meta[0]) is matched by more than one approved difference: $($matched.name -join ', ')" }
+    if ($matched.Count) { return $matched[0] }
+    return $null
+}
+
+# The expected body of a record under a rule: the old app's body (a file) with the rule's transform
+# applied, as UTF-8 bytes. Throws when the body is not a flat JSON array of strings, so a rule never
+# applies to a body it cannot reorder.
+function Get-ApprovedBody($Rule, [string]$Path) {
+    $text = [IO.File]::ReadAllText($Path, (New-Object Text.UTF8Encoding $false, $true))
+    $token = '"(?:[^"\\\x00-\x1f]|\\(?:["\\/bfnrt]|u[0-9A-Fa-f]{4}))*"'
+    if ($text -cnotmatch "^\[(?:$token(?:,$token)*)?\]$") { throw "approved difference '$($Rule.name)': the body is not a flat JSON array of strings" }
+    $elements = @([regex]::Matches($text, $token) | ForEach-Object { [pscustomobject]@{ Token = $_.Value; Value = [string](ConvertFrom-Json "{`"v`":$($_.Value)}").v } })
+    switch -CaseSensitive ($Rule.transform) {
+        'semver-order' {
+            $keys = @($elements | ForEach-Object { ConvertTo-NuGetVersionKey $_.Value | Add-Member -NotePropertyName Token -NotePropertyValue $_.Token -PassThru })
+            $ordered = [string[]]@(Get-SortedNuGetVersionKey $keys | ForEach-Object { $_.Token })
+        }
+        default { throw "unknown transform '$($Rule.transform)'" }
+    }
+    return [Text.Encoding]::UTF8.GetBytes('[' + ($ordered -join ',') + ']')
+}
+
 # The GitHub Release whose assets keep the database snapshots (get-snapshot.ps1), and an asset's
 # name: the artifact name and the id of the run that made it, from that run's URL.
 $Script:SnapshotRelease = 'snapshots-v1'

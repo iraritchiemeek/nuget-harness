@@ -13,6 +13,8 @@ Last researched: 2026-11-20. Sources are at the end.
 
 Never "fix" old behaviour silently, and never spread a quirk across the codebase.
 
+The one way to differ on purpose is an **approved difference** (spec 02b): a named rule in `recordings/approved-differences.json` that cites the bug and its evidence, and whose transform the parity checks apply to the old app's answer before comparing it byte for byte. A rule may change only the order of a list, never which elements it holds.
+
 ## Platform
 
 - **.NET 10 (LTS)**, supported until 2028-11-14.
