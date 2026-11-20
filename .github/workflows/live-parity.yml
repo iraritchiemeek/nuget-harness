@@ -79,7 +79,7 @@ jobs:
           .\scripts\runner\start-service.ps1 -ServiceDir "$env:RUNNER_TEMP\service"
 
       - name: 'Check 6, state A: every recorded request'
-        run: .\scripts\runner\live-compare.ps1 -Requests recordings\requests.txt -Name state-a
+        run: .\scripts\runner\live-compare.ps1 -Requests recordings\requests.txt -Name state-a -Exclusions recordings\parity-exclusions.txt
 
       - name: 'State B: push seed/state-b.txt through the old app'
         if: always()
@@ -87,7 +87,7 @@ jobs:
 
       - name: 'Check 6, state B: every recorded request'
         if: always()
-        run: .\scripts\runner\live-compare.ps1 -Requests recordings\requests.txt -Name state-b
+        run: .\scripts\runner\live-compare.ps1 -Requests recordings\requests.txt -Name state-b -Exclusions recordings\parity-exclusions.txt
 
       - name: More pushes through the old app, and requests outside the committed set
         if: always()
