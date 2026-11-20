@@ -87,15 +87,30 @@ jobs:
           if ($sha -ne $env:K6_SHA256) { throw "k6 $env:K6_VERSION has SHA-256 $sha" }
           Expand-Archive $zip "$env:RUNNER_TEMP\k6"
 
-      # The service logs warnings only here: at its default level it writes a line per request and
-      # per query to a redirected console, which would load the machine during the measurement.
+      # Like for like (spec 02b amendment B2). Transport: the service is called over HTTPS on
+      # localhost, as the old app is, with a self-signed certificate made here (out of out/). Logging:
+      # the service writes what the old app's process writes. IIS Express writes a console line when
+      # a request starts and one when its response is sent; the gallery's own logger has no sink in
+      # this setup (Serilog with no console and an empty Application Insights key). So the service
+      # logs ASP.NET Core's two request lines, one line each, and nothing else below Warning.
+      # benchmark.ps1 records the log bytes each app writes per request.
       - name: Restore state A and start the old app and the service
         run: |
           .\scripts\runner\reset.ps1 -Dir snapshot
-          .\scripts\runner\start-service.ps1 -ServiceDir "$env:RUNNER_TEMP\service" -Arguments '--Logging:LogLevel:Default=Warning'
+          $bytes = New-Object byte[] 16
+          [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+          $password = -join ($bytes | ForEach-Object { $_.ToString('x2') })
+          Write-Host "::add-mask::$password"
+          $cert = New-SelfSignedCertificate -DnsName localhost -CertStoreLocation Cert:\CurrentUser\My -KeyAlgorithm RSA -KeyLength 2048 -NotAfter (Get-Date).AddDays(1)
+          $pfx = "$env:RUNNER_TEMP\localhost.pfx"
+          Export-PfxCertificate -Cert $cert -FilePath $pfx -Password (ConvertTo-SecureString $password -AsPlainText -Force) | Out-Null
+          .\scripts\runner\start-service.ps1 -ServiceDir "$env:RUNNER_TEMP\service" -Url https://localhost:5443 -Arguments @(
+            "--Kestrel:Certificates:Default:Path=$pfx", "--Kestrel:Certificates:Default:Password=$password",
+            '--Logging:LogLevel:Default=Warning', '--Logging:LogLevel:Microsoft.AspNetCore.Hosting.Diagnostics=Information',
+            '--Logging:Console:FormatterName=simple', '--Logging:Console:FormatterOptions:SingleLine=true')
 
       - name: Benchmark (never fails on speed)
-        run: .\scripts\runner\benchmark.ps1 -K6 "$env:RUNNER_TEMP\k6\k6-$env:K6_VERSION-windows-amd64\k6.exe" -First ${{ inputs.first }}
+        run: .\scripts\runner\benchmark.ps1 -K6 "$env:RUNNER_TEMP\k6\k6-$env:K6_VERSION-windows-amd64\k6.exe" -First ${{ inputs.first }} -Service https://localhost:5443
 
       - name: Stop IIS Express and the service
         if: always()
