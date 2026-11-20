@@ -1,12 +1,20 @@
-# Recorded requests left out of the new service's parity checks (spec 02 checks 3 and 6), one per
-# line: the request line, then the reason. compare.ps1 refuses a GET here, and refuses a line that
-# is not in the request set. Every other recorded request is compared byte for byte.
+# Recorded requests compared in part by the new service's parity checks (spec 02 checks 3 and 6),
+# one per line: the request line, the mode, then the reason. compare.ps1 refuses an unknown mode, a
+# GET in mode excluded, and a line that is not in the request set. Every other recorded request is
+# compared byte for byte.
 #
-# Spec 02 amendment A1: methods other than GET stay with the old app. It answers them with ASP.NET's
-# developer-detail 404 page (the recorder is a local client), which embeds the framework build and a
-# stack trace. The new service answers 405 with Allow: GET, pinned by a test in service/test. The
-# next spec's proxy routes only GET on these paths to the new service, and its parity check covers
-# these requests end to end.
-POST /api/v2/package-ids?partialId=Serilog  A1: non-GET, routed to the old app by the next spec's proxy
-DELETE /api/v2/package-versions/Serilog  A1: non-GET, routed to the old app by the next spec's proxy
-PUT /api/v2/package-versions/Serilog  A1: non-GET, routed to the old app by the next spec's proxy
+# Mode excluded, spec 02 amendment A1: methods other than GET stay with the old app. It answers them
+# with ASP.NET's developer-detail 404 page (the recorder is a local client), which embeds the
+# framework build and a stack trace. The new service answers 405 with Allow: GET, pinned by a test in
+# service/test. The next spec's proxy routes only GET on these paths to the new service, and its
+# parity check covers these requests end to end.
+#
+# Mode status-only, spec 02 amendment A4: the old app's code never sees these requests. IIS trims the
+# trailing spaces of a whitespace-only id, finds no route and answers 404.4 with its detailed error
+# page, which embeds the hosting machine's file paths. The status must match; the page is not
+# compared. The service's own answer (404, empty body) is pinned by a test in service/test.
+POST /api/v2/package-ids?partialId=Serilog  excluded  A1: non-GET, routed to the old app by the next spec's proxy
+DELETE /api/v2/package-versions/Serilog  excluded  A1: non-GET, routed to the old app by the next spec's proxy
+PUT /api/v2/package-versions/Serilog  excluded  A1: non-GET, routed to the old app by the next spec's proxy
+GET /api/v2/package-versions/%20  status-only  A4: whitespace-only id, answered by IIS's own 404.4 page
+GET /api/v2/package-versions/%20%20  status-only  A4: whitespace-only id, answered by IIS's own 404.4 page

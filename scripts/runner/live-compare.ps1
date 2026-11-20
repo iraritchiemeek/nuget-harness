@@ -1,7 +1,7 @@
 # Spec 02 check 6: send one request set to the old app and to the new service, which read the same
 # live database, and require identical answers (compare.ps1). The old app's answers are the
-# expected side. -Exclusions (the A1 file) applies to the committed request set, which holds the
-# excluded requests; compare.ps1 refuses an exclusion that names no request in the set.
+# expected side. -Exclusions (recordings/parity-exclusions.txt) applies to the committed request
+# set, which holds the listed requests; compare.ps1 refuses an entry that names no request in the set.
 param([Parameter(Mandatory)] [string]$Requests, [Parameter(Mandatory)] [string]$Name,
       [string]$Exclusions, [string]$Service = 'http://localhost:5080')
 . "$PSScriptRoot\common.ps1"
