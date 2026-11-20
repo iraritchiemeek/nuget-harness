@@ -26,7 +26,7 @@ jobs:
       run:
         shell: powershell
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -38,7 +38,7 @@ jobs:
 
       - name: Restore cached seed packages (downloaded from nuget.org)
         id: seedcache
-        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}\seed-packages
           key: seed-${{ hashFiles('seed/packages.txt') }}
@@ -55,7 +55,7 @@ jobs:
 
       - name: Save seed packages
         if: steps.seedcache.outputs.cache-hit != 'true' && steps.seed.outcome == 'success'
-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}\seed-packages
           key: ${{ steps.seedcache.outputs.cache-primary-key }}
@@ -70,7 +70,7 @@ jobs:
         run: .\scripts\runner\secret-scan.ps1 -Dir out\snapshot
 
       - name: Upload snapshot
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: seed-snapshot
           path: out/snapshot/
@@ -107,7 +107,7 @@ jobs:
 
       - name: Upload check outputs
         if: always() && steps.scan.outcome == 'success'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: check-outputs
           path: |
@@ -125,7 +125,7 @@ jobs:
       run:
         shell: powershell
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -139,13 +139,13 @@ jobs:
         run: .\scripts\runner\setup.ps1
 
       - name: Download the seed snapshot from the first job
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: seed-snapshot
           path: snapshot
 
       - name: Download the first job's responses
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: check-outputs
           path: first-job
@@ -172,7 +172,7 @@ jobs:
 
       - name: Upload outputs
         if: always() && steps.scan.outcome == 'success'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: fresh-machine-restore-outputs
           path: out/
