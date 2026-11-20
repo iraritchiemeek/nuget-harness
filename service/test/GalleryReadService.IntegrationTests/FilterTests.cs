@@ -38,13 +38,14 @@ public sealed class FilterTests(GalleryDatabase database) : IAsyncLifetime
                 INTO #p
                 FROM (SELECT TOP (1) * FROM dbo.Packages WHERE PackageRegistrationKey =
                     (SELECT [Key] FROM dbo.PackageRegistrations WHERE Id = N'Serilog') ORDER BY [Key]) AS p
+                -- Written newest first, so that row order is not SemVer order.
                 CROSS JOIN (VALUES
-                    (@id, N'1.0.0', 0, NULL, 1, 0),
-                    (@id, N'2.0.0-beta', 1, NULL, 1, 0),
-                    (@id, N'3.0.0-rc.1', 1, 2, 1, 0),
-                    (@id, N'4.0.0+meta', 0, 2, 1, 0),
-                    (@id, N'5.0.0', 0, NULL, 0, 0),
                     (@id, N'6.0.0', 0, NULL, 1, 1),
+                    (@id, N'5.0.0', 0, NULL, 0, 0),
+                    (@id, N'4.0.0+meta', 0, 2, 1, 0),
+                    (@id, N'3.0.0-rc.1', 1, 2, 1, 0),
+                    (@id, N'2.0.0-beta', 1, NULL, 1, 0),
+                    (@id, N'1.0.0', 0, NULL, 1, 0),
                     (@only, N'1.0.0-rc.1', 1, 2, 1, 0)
                 ) AS c (r, v, pre, semver, listed, status);
                 UPDATE #p SET PackageRegistrationKey = NewRegistration, Version = NewVersion,
@@ -73,12 +74,8 @@ public sealed class FilterTests(GalleryDatabase database) : IAsyncLifetime
         string[] expected
     )
     {
-        // No ORDER BY in the old app's version query, so the order is the query plan's: compare as sets.
-        var versions = await _app.GetJsonAsync($"/api/v2/package-versions/{Id}{query}");
-        Assert.Equal(
-            expected.Order(StringComparer.Ordinal),
-            versions.Order(StringComparer.Ordinal)
-        );
+        // In SemVer order, which is not the order the rows were written in (see InitializeAsync).
+        Assert.Equal(expected, await _app.GetJsonAsync($"/api/v2/package-versions/{Id}{query}"));
     }
 
     [Theory]

@@ -1,4 +1,6 @@
 using GalleryReadService;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.ConfigureKestrel(kestrel =>
@@ -10,6 +12,13 @@ builder
     .BindConfiguration(DatabaseOptions.Section)
     .ValidateDataAnnotations()
     .ValidateOnStart();
+builder.Services.AddPooledDbContextFactory<GalleryDb>(
+    (services, db) =>
+        db.UseSqlServer(
+                services.GetRequiredService<IOptions<DatabaseOptions>>().Value.ConnectionString
+            )
+            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
+);
 builder.Services.AddSingleton<PackageQueries>();
 builder.Services.AddHostedService<DatabaseStartupCheck>();
 builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database");

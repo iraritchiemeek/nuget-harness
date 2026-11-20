@@ -2,8 +2,9 @@
 # change-data.sql and ../download-counts.sql against the restored state A database as the administrator, then asks the service
 # for the affected responses and checks each one against what the data now says: the state A
 # recording plus exactly the change change-data.sql made.
-# Versions are compared as sets, because the old app's version query has no ORDER BY; ID lists
-# are compared in order (ORDER BY Id, or by download count for a blank partialId). The new IDs
+# Every list is compared in order: versions in SemVer order (Get-SortedNuGetVersion in common.ps1, the
+# approved difference in recordings/approved-differences.json), IDs by ID, or by download count for
+# a blank partialId. The new IDs
 # start with "Zz" after their prefix, so under the database collation they sort after every seeded
 # ID with that prefix. Every response must be 200 with a JSON array; anything else fails its case.
 param([Parameter(Mandatory)] [string]$Recorded, [string]$Server = 'http://localhost:5080')
@@ -38,7 +39,7 @@ function Get-Recorded([string]$Path) {
 }
 
 $cases = @()
-function Test-Case([string]$What, [string]$Path, [string[]]$Expected, [switch]$AsSet) {
+function Test-Case([string]$What, [string]$Path, [string[]]$Expected) {
     $body = New-TemporaryFile
     try {
         $status = & $Curl -sS -o $body.FullName -w '%{http_code}' "$serverUrl$Path"
@@ -50,17 +51,15 @@ function Test-Case([string]$What, [string]$Path, [string[]]$Expected, [switch]$A
         return
     }
     $actual = [string[]]@($text | ConvertFrom-Json)
-    $e = $Expected; $a = $actual
-    if ($AsSet) { $e = @($e | Sort-Object); $a = @($a | Sort-Object) }
-    $ok = ($e -join "`n") -ceq ($a -join "`n")
+    $ok = ($Expected -join "`n") -ceq ($actual -join "`n")
     $script:cases += [pscustomobject]@{ Ok = $ok; What = $What; Path = $Path; Expected = ($Expected -join ','); Actual = ($actual -join ',') }
 }
 
 $serilog = Get-Recorded '/api/v2/package-versions/Serilog'
-Test-Case 'added version appears' '/api/v2/package-versions/Serilog' ($serilog + '9.9.9') -AsSet
+Test-Case 'added version appears' '/api/v2/package-versions/Serilog' (Get-SortedNuGetVersion ($serilog + '9.9.9'))
 $console = Get-Recorded '/api/v2/package-versions/Serilog.Sinks.Console'
 if ($console -cnotcontains $unlisted) { throw "the unlisted version $unlisted was not in the recording" }
-Test-Case 'unlisted version disappears' '/api/v2/package-versions/Serilog.Sinks.Console' @($console | Where-Object { $_ -cne $unlisted }) -AsSet
+Test-Case 'unlisted version disappears' '/api/v2/package-versions/Serilog.Sinks.Console' (Get-SortedNuGetVersion @($console | Where-Object { $_ -cne $unlisted }))
 Test-Case 'new ID appears under its prefix' '/api/v2/package-ids?partialId=Serilog.Sinks' ((Get-Recorded '/api/v2/package-ids?partialId=Serilog.Sinks') + 'Serilog.Sinks.ZzHarness')
 Test-Case 'new ID has its version' '/api/v2/package-versions/Serilog.Sinks.ZzHarness' @('1.0.0')
 Test-Case 'SemVer 2.0.0 prerelease ID hidden by default' '/api/v2/package-ids?partialId=Serilog' ((Get-Recorded '/api/v2/package-ids?partialId=Serilog') + 'Serilog.Sinks.ZzHarness')

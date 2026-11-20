@@ -43,11 +43,24 @@ public sealed class PackageEndpointTests(GalleryDatabase database) : IAsyncDispo
         Assert.NotEqual(ids.Order(StringComparer.Ordinal), ids, StringComparer.Ordinal);
     }
 
+    [Theory]
+    [InlineData("Serilog", new[] { "1.3.30", "1.4.128", "4.4.0" })]
+    [InlineData("Dapper", new[] { "1.42", "2.0.143", "2.1.89" })]
+    [InlineData("serilog", new[] { "1.3.30", "1.4.128", "4.4.0" })]
+    public async Task Versions_come_back_in_SemVer_order_not_push_order(
+        string id,
+        string[] expected
+    )
+    {
+        // Pushed in the order 1.4.128, 1.3.30, 4.4.0 and 2.0.143, 1.42, 2.1.89 (seed/packages.txt).
+        Assert.Equal(expected, await _app.GetJsonAsync($"/api/v2/package-versions/{id}"));
+    }
+
     [Fact]
     public async Task A_blank_prefix_asks_for_the_30_most_downloaded_ids()
     {
-        // Every seeded DownloadCount is 0, so which 30 come back is the query plan's tie order,
-        // which the recordings pin; here only the count is checked.
+        // Which 30 come back depends on the download counts, which MostDownloadedTests sets and
+        // checks; here only the count is checked.
         Assert.Equal(30, (await _app.GetJsonAsync("/api/v2/package-ids")).Length);
         Assert.Equal(30, (await _app.GetJsonAsync("/api/v2/package-ids?partialId=%20")).Length);
     }
