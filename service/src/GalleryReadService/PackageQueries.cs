@@ -15,11 +15,12 @@ namespace GalleryReadService;
 /// <list type="bullet">
 /// <item>Versions come back in SemVer order, oldest first (<see cref="VersionOrder"/>). The old
 /// query had no ORDER BY. This is an approved difference (recordings/approved-differences.json).</item>
-/// <item>Most-downloaded IDs with equal download counts come back oldest registration first. The old
-/// query left ties to the plan, which read them in registration order, so the recordings do not
-/// change. Spec 02b asks for ties by ID instead, but the recordings cut a tie of every seeded ID at
-/// 30, so an ID tie-break would return different IDs, not just a different order, and no approved
-/// difference may change which IDs come back. The owner decides (evidence/02b/run-log.md).</item>
+/// <item>Most-downloaded IDs with equal download counts come back oldest registration first
+/// (registration key). This order was chosen because it is deterministic and also matches what the
+/// old app's query plan happened to return, so every recorded answer is unchanged and no approved
+/// difference is needed. A tie-break by ID would return a different 30 IDs, not the same 30 in a
+/// new order, because the recordings cut a tie of every seeded ID at 30 (spec 02b amendment B1,
+/// evidence/02b/run-log.md).</item>
 /// </list>
 /// </remarks>
 internal sealed class PackageQueries(IDbContextFactory<GalleryDb> databases)
