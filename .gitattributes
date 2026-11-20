@@ -1,3 +1,5 @@
 # Recordings are byte-for-byte evidence. Git must never convert their line endings, or a Windows
 # checkout (core.autocrlf=true on the hosted runners) and a Linux checkout hold different bytes.
 recordings/** -text
+# Hashed into recordings/manifest.json on Windows and checked on Linux, so no line-ending conversion.
+seed/state-b.txt -text
