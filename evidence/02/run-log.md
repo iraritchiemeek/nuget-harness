@@ -78,7 +78,7 @@ Also on these commits: `lint` passed on every push, and `old-app` passed on ever
 ### Step 4: the service
 
 `service/`: an ASP.NET Core minimal API on .NET 10 (SDK pinned in `global.json`, 10.0.400 band, `latestPatch`). Microsoft.Data.SqlClient, no ORM. Each copied rule cites its old-app source in a comment:
-- The SQL repeats Entity Framework 6's generated SQL clause for clause, as read from the plan cache. The comparisons, the sort, and the order of unsorted results are left to SQL Server.
+- The SQL follows Entity Framework 6's generated SQL, as read from the plan cache: the same tables, join, filters, DISTINCT, TOP and ORDER BY. (Corrected after review: an earlier wording said "clause for clause". The text differs: Entity Framework adds `OR (1 = 0)`, orders some clauses differently and wraps the most-downloaded query in a `[Project2]` subquery.) The comparisons, the sort, and the order of unsorted results are left to SQL Server.
 - `LikePattern`: escapes `%`, `_`, `[` and `~` with `~`, as EF6 does.
 - `LegacyQuery`: takes the first value of a repeated key, and a `bool?` that does not parse binds null (MVC 5).
 - `PackageFilter`: `semVerLevel` is parsed with NuGet.Versioning 6.13.2, the gallery's own version.

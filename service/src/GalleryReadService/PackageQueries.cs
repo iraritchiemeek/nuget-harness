@@ -10,11 +10,14 @@ namespace GalleryReadService;
 /// no migrations.
 /// </summary>
 /// <remarks>
-/// The SQL repeats, clause for clause, what NuGetGallery's Entity Framework 6 queries generate
+/// The SQL follows what NuGetGallery's Entity Framework 6 queries generate
 /// (src/NuGetGallery/Queries/AutocompleteDatabasePackageIdsQuery.cs and
-/// AutocompleteDatabasePackageVersionsQuery.cs). The text was read from the old app's database
-/// plan cache by the recording workflow (scripts/runner/dump-sql.ps1). Matching, sorting and the
-/// order of unsorted results are all decided by SQL Server, so they must stay in SQL:
+/// AutocompleteDatabasePackageVersionsQuery.cs), as read from the old app's database plan cache by
+/// the recording workflow (scripts/runner/dump-sql.ps1): the same tables, join, filters, DISTINCT,
+/// TOP and ORDER BY. The text is not identical. Entity Framework also writes an always-false
+/// <c>OR (1 = 0)</c>, puts some clauses in a different order, and wraps the most-downloaded query
+/// in a <c>[Project2]</c> subquery. Checks 3 and 6 compare the results, not the text. Matching,
+/// sorting and the order of unsorted results are all decided by SQL Server, so they must stay in SQL:
 /// <list type="bullet">
 /// <item>IDs and prefixes match case-insensitively, under the database collation.</item>
 /// <item><c>package-versions</c> has no ORDER BY. Versions come back in the order the query plan reads them.</item>
