@@ -94,7 +94,7 @@ jobs:
         run: |
           .\scripts\runner\push-extra.ps1 -List seed\live-parity-extra.txt
           . .\scripts\runner\common.ps1
-          $set = @(Invoke-Sql (Get-Content scripts\download-counts.sql -Raw) -Database NuGetGallery)
+          $set = Invoke-Sql (Get-Content scripts\download-counts.sql -Raw) -Database NuGetGallery # one array of rows
           if ($set.Count -ne 32) { throw "download-counts.sql set $($set.Count) counts, expected 32" }
           Write-Summary "- download counts: 32 distinct counts set in the database (scripts/download-counts.sql)"
           .\scripts\runner\random-requests.ps1 -Seed $env:GITHUB_RUN_ID -OutFile out\random-requests.txt
