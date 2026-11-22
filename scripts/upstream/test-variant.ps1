@@ -1,7 +1,7 @@
 # Clean Release build of the checkout in gallery/ (which compiles the Razor views) and a run of
 # NuGetGallery.Facts, with the commands of upstream's own CI. A failing test does not fail this
 # script; compare-variants.ps1 judges the results. Writes to out\variant:
-#   warnings.txt  the distinct warnings of the build, without paths and line numbers
+#   warnings.txt  MSBuild's total, then the distinct warnings of the build, without paths and line numbers
 #   tests.tsv     one line per test result: class.method, outcome, the display name and message of a failure
 . "$PSScriptRoot/../runner/common.ps1"
 $dir = Join-Path $OutDir 'variant'
@@ -11,9 +11,13 @@ Push-Location $GalleryDir
 try {
     & pwsh -NoProfile -File .\build.ps1 -Configuration Release -SkipCommon -SkipJobs -SkipArtifacts *>&1 | Tee-Object -FilePath $log
     if ($LASTEXITCODE -ne 0) { throw "build.ps1 exited $LASTEXITCODE" }
-    $warnings = @(Get-Content $log | Where-Object { $_ -cmatch '\bwarning [A-Z]+\d*\s?:' } |
-        ForEach-Object { ($_ -creplace '^.*?([^\\/(:]+)\(\d+(,\d+)*\): ', '$1: ' -creplace '\s*\[[^\]]*\]\s*$', '').Trim() } | Sort-Object -Unique)
-    Write-Utf8File (Join-Path $dir 'warnings.txt') $warnings
+    # A warning may have no code (ASPNETCOMPILER : warning : ..., from the Razor views) or one like xUnit2009.
+    $warnings = @(Get-Content $log | Where-Object { $_ -cmatch '\bwarning\s*([A-Za-z]+\d+)?\s*:' } |
+        ForEach-Object { ($_ -creplace '^\s*(\d+(:\d+)?>)?', '' -creplace '^.*?([^\\/(:]+)\(\d+(,\d+)*\): ', '$1: ' -creplace '\s*\[[^\]]*\]\s*$', '').Trim() } | Sort-Object -Unique)
+    # MSBuild's own count, so that a warning the pattern above misses still shows.
+    $total = @(Get-Content $log | Where-Object { $_ -cmatch '^\s+\d+ Warning\(s\)\s*$' } | ForEach-Object { [int]($_.Trim() -split ' ')[0] })
+    if ($total.Count -ne 1) { throw "the build log holds $($total.Count) warning totals, expected 1" }
+    Write-Utf8File (Join-Path $dir 'warnings.txt') @("MSBuild total: $($total[0])"; $warnings)
 
     & "$PSScriptRoot/audit.ps1" -Log $log
 
@@ -36,4 +40,4 @@ Write-Utf8File (Join-Path $dir 'tests.tsv') $lines
 $c = $x.TestRun.ResultSummary.Counters
 if ([int]$c.total -ne $lines.Count -or [int]$c.total -lt 10000) { throw "$($c.total) results in the summary, $($lines.Count) written" }
 $global:LASTEXITCODE = 0   # failing tests are judged by compare-variants.ps1
-Write-Summary "- Release build: ok, $($warnings.Count) distinct warnings; NuGetGallery.Facts: $($c.total) results, $($c.passed) passed, $($c.failed) failed"
+Write-Summary "- Release build: ok, $($total[0]) warnings ($($warnings.Count) distinct); NuGetGallery.Facts: $($c.total) results, $($c.passed) passed, $($c.failed) failed"

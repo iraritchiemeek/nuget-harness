@@ -77,10 +77,12 @@ Compare-WithBase 'fix' { param($d) [void]$d; @{ Outcome = 'Passed'; Message = $n
 
 $w0 = @(Get-Content (Join-Path $Dir 'test-results-base/warnings.txt') | Where-Object { $_ })
 $w1 = @(Get-Content (Join-Path $Dir 'test-results-fix/warnings.txt') | Where-Object { $_ })
+# The first line is MSBuild's total, so a different total is reported as a new line too.
+if (-not ($w0.Count -and $w1.Count -and $w0[0].StartsWith('MSBuild total: ') -and $w1[0].StartsWith('MSBuild total: '))) { throw 'a warnings.txt has no total' }
 $newWarnings = @($w1 | Where-Object { $w0 -cnotcontains $_ })
-$report.Add("Release build warnings: base $($w0.Count), fix $($w1.Count), new $($newWarnings.Count)")
+$report.Add("Release build warnings: base $($w0.Count - 1) distinct ($($w0[0])), fix $($w1.Count - 1) distinct ($($w1[0])), new $($newWarnings.Count)")
 foreach ($w in $newWarnings) { $problems.Add("new build warning: $w") }
-Write-Summary "- Release build: $($w0.Count) distinct warnings on the base, $($newWarnings.Count) new with the fix"
+Write-Summary "- Release build: $($w0[0]), $($w0.Count - 1) distinct on the base; $($w1[0]), $($newWarnings.Count) new with the fix"
 
 New-Item -ItemType Directory -Force -Path (Join-Path $OutDir 'checks') | Out-Null
 Write-Utf8File (Join-Path $OutDir "checks/spec03-$Pr-tests.txt") (@($report) + @($problems | ForEach-Object { "PROBLEM $_" }))
