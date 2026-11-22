@@ -1,0 +1,163 @@
+name: upstream-fix
+
+# Spec 03: the checks of one upstream fix (upstream/*.patch, described in upstream/fixes.json), or of
+# all three together. Run by hand. A patched build never reaches the shared build cache: the test jobs
+# use no cache, and the app job patches only after gallery-build has run on the unpatched checkout.
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Which fix (all = check 6, the three together)
+        type: choice
+        options: [a, b, c, all]
+        required: true
+
+run-name: upstream-fix ${{ inputs.pr }}
+
+permissions:
+  contents: read
+
+env:
+  UPSTREAM_SHA: 06b7a81ab7bb92d5009082789b9e4ec5c81586cb # NuGetGallery dev, the base of every patch
+  HARNESS_SHA: 63e6ee4202b441e1c904d6f78fc7b070f36bc24f # the commit specs 01 and 02 run (PR A's app check)
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+jobs:
+  # Checks 1 and 6 (the patches themselves).
+  patches:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: NuGet/NuGetGallery
+          ref: ${{ env.UPSTREAM_SHA }}
+          path: gallery
+          persist-credentials: false
+      - name: Each patch applies alone, touches only its files, and all orders give one tree
+        shell: pwsh
+        run: ./scripts/upstream/check-patches.ps1
+
+  # Checks 2 to 5: one clean Release build and test run per variant, as upstream's CI does it.
+  test:
+    needs: patches
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: ${{ fromJSON(inputs.pr == 'all' && '["base","fix"]' || '["base","tests-only","wrong-fix","fix"]') }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: NuGet/NuGetGallery
+          ref: ${{ env.UPSTREAM_SHA }}
+          path: gallery
+          persist-credentials: false
+      - name: Apply the variant
+        env:
+          PR: ${{ inputs.pr }}
+        run: ./scripts/upstream/apply-variant.ps1 -Pr $env:PR -Variant ${{ matrix.variant }}
+      - name: Build (Release) and run NuGetGallery.Facts
+        run: ./scripts/upstream/test-variant.ps1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: test-results-${{ matrix.variant }}
+          path: out/variant/
+          if-no-files-found: error
+
+  compare:
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: test-results-*
+          path: results
+      - name: Compare every variant with the base
+        shell: pwsh
+        env:
+          PR: ${{ inputs.pr }}
+        run: ./scripts/upstream/compare-variants.ps1 -Pr $env:PR -Dir results
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: test-comparison
+          path: out/checks/
+          if-no-files-found: warn
+
+  # The extra check of each fix, on the running app. A runs at the harness base, B and C at the upstream base.
+  app:
+    if: inputs.pr != 'all'
+    needs: patches
+    runs-on: windows-2022
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: powershell
+    env:
+      GH_TOKEN: ${{ github.token }} # get-snapshot.ps1 reads the snapshots-v1 release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build the unpatched gallery, or restore it from cache
+        uses: ./.github/actions/gallery-build
+        with:
+          gallery-sha: ${{ inputs.pr == 'a' && env.HARNESS_SHA || env.UPSTREAM_SHA }}
+
+      - name: Setup (gallery tools\Setup-DevEnvironment.ps1)
+        run: .\scripts\runner\setup.ps1
+
+      - name: 'PR A: every recorded request, unpatched and patched, in both data states'
+        if: inputs.pr == 'a'
+        run: |
+          .\scripts\runner\get-snapshot.ps1 -State a -Dir snapshot-a
+          .\scripts\runner\get-snapshot.ps1 -State b -Dir snapshot-b
+          .\scripts\upstream\check-a.ps1 -SnapshotA snapshot-a -SnapshotB snapshot-b
+
+      - name: 'PR B: the delete-symbols page, unpatched and patched'
+        if: inputs.pr == 'b'
+        run: |
+          .\scripts\runner\start-site.ps1
+          .\scripts\upstream\check-b.ps1
+
+      - name: 'PR C: the manage packages page, unpatched and patched'
+        if: inputs.pr == 'c'
+        run: |
+          .\scripts\runner\start-site.ps1
+          .\scripts\upstream\check-c.ps1
+
+      - name: Stop IIS Express
+        if: always()
+        run: .\scripts\runner\stop-site.ps1
+
+      - name: Secret scan of the outputs
+        id: scan
+        if: always()
+        run: .\scripts\upstream\scan.ps1
+
+      - name: Upload outputs
+        if: always() && steps.scan.outcome == 'success'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: app-check-${{ inputs.pr }}
+          path: out/
+          if-no-files-found: warn
