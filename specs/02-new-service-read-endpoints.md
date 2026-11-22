@@ -135,6 +135,10 @@ Changes made after work started, each with its reason. The original wording abov
   - Any record not listed is still compared byte for byte.
   - The exclusions file is hashed in the manifest, so it can't change without a re-record.
 
+**A5. Commits no longer carry the co-author trailer.**
+- **What changed:** the trailer required by "Agent authorship is visible" under Guardrails was dropped on 2026-11-22, at the repository owner's request. Commits up to `3d00513` are unchanged, and later ones don't carry it.
+- **What still shows agent authorship:** the README says who wrote what, and the run logs record the work of each agent session.
+
 ## Out of scope for this spec
 
 - **The front proxy that routes these two endpoints to the new service and everything else to the old app.** That is the next spec, and it turns this side-by-side service into a real strangler.

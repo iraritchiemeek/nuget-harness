@@ -6,7 +6,7 @@ The legacy app is [NuGetGallery](https://github.com/NuGet/NuGetGallery), the ASP
 
 **Which half of the old app this is.** NuGetGallery has two implementations of each of these endpoints, chosen at startup by [`DefaultDependenciesModule.ConfigureAutocomplete`](https://github.com/NuGet/NuGetGallery/blob/63e6ee4202b441e1c904d6f78fc7b070f36bc24f/src/NuGetGallery/App_Start/DefaultDependenciesModule.cs). When a search service is configured, the search service answers them. When none is configured, as in local development and here, the app answers from its database. What this repository records, migrates and benchmarks is that database fallback. Nothing here says how a gallery with a search service answers, or how fast it is.
 
-**Who wrote what.** No human wrote or reviewed the code. A human wrote and directed the specs in `specs/`. The code, the tests, the workflows and the evidence in `evidence/` were produced by AI agents, and each commit carries the agent's co-author trailer. Independent reviewer agents read the code; their findings and resolutions are in [`evidence/02/reviews.md`](evidence/02/reviews.md).
+**Who wrote what.** No human wrote or reviewed the code. A human wrote and directed the specs in `specs/`. The code, the tests, the workflows and the evidence in `evidence/` were produced by AI agents, and the agents' commits up to `3d00513` (2026-11-22) carry the agent's co-author trailer, apart from the first spec 01 commit, `d89e637`. Later commits don't carry it. Independent reviewer agents read the code; their findings and resolutions are in [`evidence/02/reviews.md`](evidence/02/reviews.md).
 
 ## How the claim is checked
 
