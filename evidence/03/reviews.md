@@ -43,7 +43,7 @@ Status: T6 (the order of posting) is open, and is the owner's decision. T1 was s
 
 | # | Finding | Resolution | Commit or run |
 |---|---|---|---|
-| T1 | (R2) The authorship line in the drafts reads as if nobody had read the change. | Owner decision, 2026-11-22: the drafts carry no authorship line (spec 03, amendment U3). |
+| T1 | (R2) Wording of the authorship line in the drafts. | Owner decision, 2026-11-22: the drafts carry no authorship line (spec 03, amendment U3). |
 | T2 | (R2) Upstream's CI fails on the HtmlSanitizer advisory, and the text should say so. | Each pull request says its run builds with NU1903 not treated as an error, and why. It links [upstream run 44770292233](https://github.com/NuGet/NuGetGallery/actions/runs/44770292233), whose "NuGetGallery build and test" and "Build artifacts" logs were read. Its pull request changes only `RemovedPackages.md`. | d8f775c |
 | T3 | (R2) Remove "Is a pull request welcome?", and the comment drafts. | Done (amendment U2). The only question left is C's. | d8f775c, ebe906f |
 | T4 | (R2) Remove "found by reading the open issues" from the posts. | Done. The run log says it. | d8f775c |

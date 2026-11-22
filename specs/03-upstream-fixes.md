@@ -158,7 +158,7 @@ Nothing here happens without the owner's explicit approval of that PR, after rea
 
 | Item | What's in it |
 |---|---|
-| `upstream/` | three patches and the drafts |
+| `upstream/` | three patches and the wrong fixes |
 | `.github/workflows/upstream-fix.yml` | the checks |
 | `evidence/03/run-log.md` | every run, decision and failure, with links |
 | `evidence/03/reviews.md` | reviewer findings and resolutions |
@@ -181,6 +181,8 @@ Changes made after work started, each with its reason. The original wording abov
 **U3 (2026-11-22). No authorship line in the posts.**
 - **What the spec said:** the text says who wrote the fix and tests, and who approved posting them.
 - **What changed, at the owner's decision:** the issue and the pull requests describe the bug, the fix and how it was tested, and say nothing about authorship. That B and C were found by reading the issue list is in the run log, not in the posts.
+
+**U4 (2026-11-22). The drafts are not kept in this repository.** The text to post is working material until it is posted, so the owner keeps it. The patches, checks and results stay here.
 
 ## Out of scope
 
