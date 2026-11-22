@@ -164,6 +164,25 @@ Nothing here happens without the owner's explicit approval of that PR, after rea
 | `evidence/03/run-log.md` | every run, decision and failure, with links |
 | `evidence/03/reviews.md` | reviewer findings and resolutions |
 
+## Amendments
+
+Changes made after work started, each with its reason. The original wording above is kept so the change is visible.
+
+**U1 (2026-11-22). PR B: `absoluteLatest` gets no special case.**
+- **What the spec said:** check `absoluteLatest` first, and "keep whatever it does today, with a test if it reaches the fallback". The first reviewed patch did that, with a test class.
+- **What changed:** the special case and its test class are gone. `absoluteLatest` now gives a 404, like any other version that isn't found.
+- **Why (both reviewers):** the alias is not handled by this action. It fell into the fallback, `FilterLatestPackage`, which prefers the latest **stable** version, where `DisplayPackage` takes `absoluteLatest` to be the latest version including prereleases. So the alias could show a different version from the one it names, on a page whose purpose is deletion. Nothing in upstream's `src` links to the page with it.
+- **The app check** keeps both `absoluteLatest` rows. They now expect 200 before and 404 after.
+- **Also:** an empty version counts as no version. The app check has a row for `?version=`.
+
+**U2 (2026-11-22). PRs B and C: no comment on the existing issue.**
+- **What the spec said:** B and C get a short draft comment for their issue (check 8), posted before the pull request (Submitting, step 1).
+- **What changed:** both drafts are deleted. The pull request links its issue, and C's asks its one question itself. Checking that the issue is still open with no linked pull request stays.
+
+**U3 (2026-11-22). The disclosure is the owner's to confirm.**
+- **What the spec said:** the text says that AI agents wrote the fix and tests, "and a human approved posting them".
+- **What changed:** every draft says "AI agents wrote this change and its test. [OWNER TO CONFIRM BEFORE POSTING]" and nothing about a human, until the owner decides the wording. That B and C were found by reading the issue list is in the run log, not in the posts.
+
 ## Out of scope
 
 - the front proxy
