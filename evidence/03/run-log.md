@@ -161,7 +161,7 @@ Relaxing it was the first agent's decision. The orchestrator confirmed that a wo
 
 ## What backs each claim in the drafts
 
-The drafts were removed from the repository on 2026-11-22 (spec 03, amendment U4). Their last committed versions are in `0691cb6`.
+The drafts were removed from the repository on 2026-11-22 (spec 03, amendment U4).
 
 Runs: A is 44980456732, B is 44980465212, C is 44980473424. "Source" is upstream at 06b7a81.
 
