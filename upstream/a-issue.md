@@ -2,6 +2,8 @@
 
 Self-hosted issue template (`.github/ISSUE_TEMPLATE/SELF_HOSTED.yml`). Everything below the line is the text to post.
 
+**Not ready to post.** Nothing marked `[PENDING]` has been observed in a run yet. Each such claim goes back in only once a run backs it.
+
 ---
 
 **Title:** [Self-hosted Bug]: package-versions returns versions in no defined order when no search service is configured
@@ -19,7 +21,7 @@ This is about the database fallback only. `DefaultDependenciesModule.ConfigureAu
 1. Using this git commit of NuGetGallery: 06b7a81ab7bb92d5009082789b9e4ec5c81586cb (dev)
 2. Run the gallery locally with no search service configured, and push Serilog 1.4.128, then 1.3.30, then 4.4.0.
 3. Request `/api/v2/package-versions/Serilog`.
-4. The answer is `["1.4.128","1.3.30","4.4.0"]`.
+4. [PENDING: the answer at this commit. `["1.4.128","1.3.30","4.4.0"]` was recorded at 63e6ee4202b441e1c904d6f78fc7b070f36bc24f only.]
 
 **Expected Behavior**
 
