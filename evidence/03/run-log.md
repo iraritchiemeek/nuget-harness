@@ -157,7 +157,7 @@ Relaxing it was the first agent's decision. The orchestrator confirmed that a wo
 - **The comments for B and C are dropped** (amendment U2). Both drafts are deleted.
 - **B and C were found by reading the open issues.** The posts don't say so any more (review T4).
 - **C1 is scoped out.** When the fallback version is Staged, the same method probably throws `ArgumentOutOfRangeException` (read from the code, not run). #5675 is only about no versions.
-- **Pending with the owner:** the disclosure wording (T1), and the order of posting (T6).
+- **Settled by the owner (2026-11-22):** the posts carry no authorship line (T1). **Pending with the owner:** the order of posting (T6).
 
 ## What backs each claim in the drafts
 
@@ -194,7 +194,6 @@ Runs: A is 44980456732, B is 44980465212, C is 44980473424. "Source" is upstream
 | C PR | every permission is false, and who can accept is checked as before | the patch; Source: `UsersController.cs`, line 1772, unchanged by it |
 | C PR | the new test fails without the fix; 11,826 passed, 2 skipped, 0 failed | run C, `test-results-tests-only` and `test-results-fix` |
 | C PR | the registration was inserted into the test database | `check-c.ps1` |
-| all | AI agents wrote the change and its test | [README](../../README.md). The line is the owner's to confirm |
 
 ## Privacy
 

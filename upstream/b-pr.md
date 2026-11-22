@@ -2,7 +2,7 @@
 
 Branch name: `Bug-6931`. Everything below the line is the text to post.
 
-Not to be posted before the repository owner approves it and settles the disclosure line. It holds the fixes from the independent review ([`evidence/03/reviews.md`](../evidence/03/reviews.md)), and replaces the version that was reviewed. The backing of each claim is in [`evidence/03/run-log.md`](../evidence/03/run-log.md).
+Not to be posted before the repository owner approves it. It holds the fixes from the independent review ([`evidence/03/reviews.md`](../evidence/03/reviews.md)), and replaces the version that was reviewed. The backing of each claim is in [`evidence/03/run-log.md`](../evidence/03/run-log.md).
 
 ---
 
@@ -20,7 +20,5 @@ Return 404 from delete symbols page when version doesn't exist
 `NuGetGallery.Facts` with the change: 11,827 passed, 2 skipped, 0 failed ([run](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44980465212)). In the same run, on a running gallery as the owner, a version that doesn't exist showed the latest version before the change and gives a 404 after it. An existing version and no version are unchanged.
 
 The run builds with NU1903 not treated as an error, because the HtmlSanitizer 9.0.892 advisory currently fails restore on `dev` ([example](https://github.com/NuGet/NuGetGallery/actions/runs/44770292233)).
-
-AI agents wrote this change and its test. [OWNER TO CONFIRM BEFORE POSTING]
 
 Addresses https://github.com/NuGet/NuGetGallery/issues/6931

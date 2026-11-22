@@ -11,7 +11,7 @@ It reads the same database the old app uses, without changing it. "Exactly" mean
 
 The old app is the only source of truth. Expected answers are never written by hand or by the agent building the service. They are recorded from the running old app.
 
-No human writes or reviews code at any stage. Every claim is backed by a public run anyone can open.
+Every claim is backed by a public run anyone can open.
 
 ## How the work loops
 

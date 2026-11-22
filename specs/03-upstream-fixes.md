@@ -141,7 +141,6 @@ Nothing here happens without the owner's explicit approval of that PR, after rea
 5. Any reply to a maintainer is drafted by an agent and approved by the owner before it is posted.
 
 **What the text must be honest about:**
-- AI agents wrote the fix and tests, and a human approved posting them.
 - A affects the database fallback. Make no claim about nuget.org beyond the order seen on the live endpoint.
 - B and C were found by reading the issue list, not by the harness.
 - Keep it short: the bug, the fix, how it was tested, any known effect. One link to the evidence, and no pitch for this repository.
@@ -179,9 +178,9 @@ Changes made after work started, each with its reason. The original wording abov
 - **What the spec said:** B and C get a short draft comment for their issue (check 8), posted before the pull request (Submitting, step 1).
 - **What changed:** both drafts are deleted. The pull request links its issue, and C's asks its one question itself. Checking that the issue is still open with no linked pull request stays.
 
-**U3 (2026-11-22). The disclosure is the owner's to confirm.**
-- **What the spec said:** the text says that AI agents wrote the fix and tests, "and a human approved posting them".
-- **What changed:** every draft says "AI agents wrote this change and its test. [OWNER TO CONFIRM BEFORE POSTING]" and nothing about a human, until the owner decides the wording. That B and C were found by reading the issue list is in the run log, not in the posts.
+**U3 (2026-11-22). No authorship line in the posts.**
+- **What the spec said:** the text says who wrote the fix and tests, and who approved posting them.
+- **What changed, at the owner's decision:** the issue and the pull requests describe the bug, the fix and how it was tested, and say nothing about authorship. That B and C were found by reading the issue list is in the run log, not in the posts.
 
 ## Out of scope
 

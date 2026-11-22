@@ -2,7 +2,7 @@
 
 Self-hosted issue template (`.github/ISSUE_TEMPLATE/SELF_HOSTED.yml`). Everything below the line is the text to post.
 
-Not to be posted before the repository owner approves it and settles the disclosure line. It holds the fixes from the independent review ([`evidence/03/reviews.md`](../evidence/03/reviews.md)), and replaces the version that was reviewed. The backing of each claim is in [`evidence/03/run-log.md`](../evidence/03/run-log.md).
+Not to be posted before the repository owner approves it. It holds the fixes from the independent review ([`evidence/03/reviews.md`](../evidence/03/reviews.md)), and replaces the version that was reviewed. The backing of each claim is in [`evidence/03/run-log.md`](../evidence/03/run-log.md).
 
 ---
 
@@ -28,4 +28,4 @@ Versions in SemVer order, oldest first: `["1.3.30","1.4.128","4.4.0"]`.
 
 **Additional Context and logs**
 
-A small fix with a test is ready. AI agents wrote this change and its test. [OWNER TO CONFIRM BEFORE POSTING]
+A small fix with a test is ready.

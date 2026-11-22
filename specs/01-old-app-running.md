@@ -10,7 +10,7 @@ This is the "before" half of every later comparison. The new service will be com
 - **Resettable.** The data can go back to a known state on command.
 - **Untouched.** No changes to the old app's source code. Config changes are allowed, but every one is recorded as a diff.
 
-No human writes or reviews code at any stage. Every claim is backed by a public run log anyone can open.
+Every claim is backed by a public run log anyone can open.
 
 ## Why GitHub Actions, not a cloud server
 

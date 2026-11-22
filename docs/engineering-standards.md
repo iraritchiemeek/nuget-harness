@@ -109,7 +109,7 @@ A rule may be raised or lowered only in `.editorconfig`, with a comment giving t
 - A `/health` endpoint checks database connectivity. It sits outside the parity set and is listed as such.
 - Startup fails fast on bad configuration or an unreachable database.
 
-## Review by agents, never by people
+## Independent review by agents
 
 After the gates pass, independent reviewer agents read the code with fresh context. Each sees only the code, this file and the spec, never the builder's reasoning. Each has one lens:
 - **Correctness:** edge cases, parity risks.

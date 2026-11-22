@@ -2,7 +2,7 @@
 
 Branch name: `Bug-ISSUE`. Replace `ISSUE` with the number of the issue posted from `a-issue.md`. Everything below the line is the text to post.
 
-Not to be posted before the repository owner approves it and settles the disclosure line. It holds the fixes from the independent review ([`evidence/03/reviews.md`](../evidence/03/reviews.md)), and replaces the version that was reviewed. The backing of each claim is in [`evidence/03/run-log.md`](../evidence/03/run-log.md).
+Not to be posted before the repository owner approves it. It holds the fixes from the independent review ([`evidence/03/reviews.md`](../evidence/03/reviews.md)), and replaces the version that was reviewed. The backing of each claim is in [`evidence/03/run-log.md`](../evidence/03/run-log.md).
 
 ---
 
@@ -17,7 +17,5 @@ Sort database package-versions results by SemVer
 `NuGetGallery.Facts` with the change: 11,826 passed, 2 skipped, 0 failed ([run](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44980456732)). The same run compared a gallery's answers to 351 requests before and after, at 63e6ee4, where the query file is the same as on `dev`: only the order of versions differs.
 
 The run builds with NU1903 not treated as an error, because the HtmlSanitizer 9.0.892 advisory currently fails restore on `dev` ([example](https://github.com/NuGet/NuGetGallery/actions/runs/44770292233)).
-
-AI agents wrote this change and its test. [OWNER TO CONFIRM BEFORE POSTING]
 
 Addresses https://github.com/NuGet/NuGetGallery/issues/ISSUE

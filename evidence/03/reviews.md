@@ -4,7 +4,7 @@ Two independent reviewer agents with fresh context read the three patches as the
 
 Neither found a technical blocker. R2 raised two blockers outside the code (T1, T2). The patches they reviewed are superseded by `8c6e50d`, which holds the code fixes. The drafts they reviewed are superseded by `d8f775c`.
 
-Status: two findings are open, T1 and T6, and both are the owner's decision. The revised patches and drafts have not had a second independent review. Every check ran again on `8c6e50d`: a [44980456732](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44980456732), b [44980465212](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44980465212), c [44980473424](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44980473424), all [44980481812](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44980481812).
+Status: T6 (the order of posting) is open, and is the owner's decision. T1 was settled by the owner on 2026-11-22. The revised patches and drafts have not had a second independent review. Every check ran again on `8c6e50d`: a [44980456732](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44980456732), b [44980465212](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44980465212), c [44980473424](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44980473424), all [44980481812](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44980481812).
 
 ## A. Version order
 
@@ -43,7 +43,7 @@ Status: two findings are open, T1 and T6, and both are the owner's decision. The
 
 | # | Finding | Resolution | Commit or run |
 |---|---|---|---|
-| T1 | (R2) "A human approved posting them" reads as "nobody read this". | **Owner decision, pending.** Until then every draft says "AI agents wrote this change and its test. [OWNER TO CONFIRM BEFORE POSTING]", and nothing says a person reviewed it (amendment U3). | d8f775c |
+| T1 | (R2) The authorship line in the drafts reads as if nobody had read the change. | Owner decision, 2026-11-22: the drafts carry no authorship line (spec 03, amendment U3). |
 | T2 | (R2) Upstream's CI fails on the HtmlSanitizer advisory, and the text should say so. | Each pull request says its run builds with NU1903 not treated as an error, and why. It links [upstream run 44770292233](https://github.com/NuGet/NuGetGallery/actions/runs/44770292233), whose "NuGetGallery build and test" and "Build artifacts" logs were read. Its pull request changes only `RemovedPackages.md`. | d8f775c |
 | T3 | (R2) Remove "Is a pull request welcome?", and the comment drafts. | Done (amendment U2). The only question left is C's. | d8f775c, ebe906f |
 | T4 | (R2) Remove "found by reading the open issues" from the posts. | Done. The run log says it. | d8f775c |
