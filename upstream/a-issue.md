@@ -2,7 +2,7 @@
 
 Self-hosted issue template (`.github/ISSUE_TEMPLATE/SELF_HOSTED.yml`). Everything below the line is the text to post.
 
-Not to be posted before the repository owner approves it, after the independent review. The backing of each claim is in [`evidence/03/run-log.md`](../evidence/03/run-log.md).
+Not to be posted before the repository owner approves it and settles the disclosure line. It holds the fixes from the independent review ([`evidence/03/reviews.md`](../evidence/03/reviews.md)), and replaces the version that was reviewed. The backing of each claim is in [`evidence/03/run-log.md`](../evidence/03/run-log.md).
 
 ---
 
@@ -18,10 +18,9 @@ This is about the database fallback only. `DefaultDependenciesModule.ConfigureAu
 
 **Repro Steps**
 
-1. Using this git commit of NuGetGallery: 63e6ee4202b441e1c904d6f78fc7b070f36bc24f. The query file is the same on `dev` at 06b7a81ab7bb92d5009082789b9e4ec5c81586cb.
-2. Run the gallery with no search service configured, with Serilog 1.4.128, 1.3.30 and 4.4.0 pushed in that order.
-3. Request `/api/v2/package-versions/Serilog`.
-4. The answer is `["1.4.128","1.3.30","4.4.0"]`, seen on a gallery in CI that also holds other packages, restored from a snapshot ([run](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44977396894)).
+1. Using this git commit of NuGetGallery: 63e6ee4202b441e1c904d6f78fc7b070f36bc24f (the query file is the same on `dev` at 06b7a81ab7bb92d5009082789b9e4ec5c81586cb).
+2. Run the gallery with no search service configured, and push Serilog 1.4.128, 1.3.30 and 4.4.0 in that order.
+3. Request `/api/v2/package-versions/Serilog`. The answer is `["1.4.128","1.3.30","4.4.0"]` ([run](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44980456732), on a gallery restored from a snapshot).
 
 **Expected Behavior**
 
@@ -29,4 +28,4 @@ Versions in SemVer order, oldest first: `["1.3.30","1.4.128","4.4.0"]`.
 
 **Additional Context and logs**
 
-Found by an automated comparison of the endpoint's answers, written and run by AI agents. They also wrote a small fix with a test, which I can open as a pull request. A human approved posting this.
+A small fix with a test is ready. AI agents wrote this change and its test. [OWNER TO CONFIRM BEFORE POSTING]
