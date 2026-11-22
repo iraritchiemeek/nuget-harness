@@ -16,7 +16,7 @@ index 22dc658a50fd88af6f2740d5c17aab9f5107435b..82fed0c8d04f3f2963e4e400e22a111a
              return new OwnerRequestsListItemViewModel
              {
 diff --git a/src/NuGetGallery/Helpers/ViewModelExtensions/ListPackageItemViewModelFactory.cs b/src/NuGetGallery/Helpers/ViewModelExtensions/ListPackageItemViewModelFactory.cs
-index 658719d2a19a0090d4420b895ba806d4d5f3cbaf..2858ae4e685603c4ee1bbede90b70216c30230e5 100644
+index 658719d2a19a0090d4420b895ba806d4d5f3cbaf..c8274825371544c1fc76ae2a312c318c337a63cb 100644
 --- a/src/NuGetGallery/Helpers/ViewModelExtensions/ListPackageItemViewModelFactory.cs
 +++ b/src/NuGetGallery/Helpers/ViewModelExtensions/ListPackageItemViewModelFactory.cs
 @@ -28,6 +28,18 @@ public ListPackageItemViewModel Create(Package package, User currentUser, bool i
@@ -24,9 +24,9 @@ index 658719d2a19a0090d4420b895ba806d4d5f3cbaf..2858ae4e685603c4ee1bbede90b70216
          }
  
 +        /// <summary>
-+        /// Creates a view model for an ID that has no versions. Every permission on the view model is left false.
++        /// Creates a view model for an ID that has no versions, with no permissions.
 +        /// </summary>
-+        public ListPackageItemViewModel CreateWithoutVersion(PackageRegistration packageRegistration)
++        internal ListPackageItemViewModel CreateWithoutVersion(PackageRegistration packageRegistration)
 +        {
 +            return new ListPackageItemViewModel
 +            {
@@ -39,10 +39,10 @@ index 658719d2a19a0090d4420b895ba806d4d5f3cbaf..2858ae4e685603c4ee1bbede90b70216
          {
              _packageViewModelFactory.Setup(viewModel, package);
 diff --git a/tests/NuGetGallery.Facts/Controllers/UsersControllerFacts.cs b/tests/NuGetGallery.Facts/Controllers/UsersControllerFacts.cs
-index 823c0b8e07a0db8df8c99651095c370f9bea6bba..78a046613ff0294448d5f0fc16bc0320f4f1038b 100644
+index 823c0b8e07a0db8df8c99651095c370f9bea6bba..e95ef98935963e48182b985d01e07784004bd2ea 100644
 --- a/tests/NuGetGallery.Facts/Controllers/UsersControllerFacts.cs
 +++ b/tests/NuGetGallery.Facts/Controllers/UsersControllerFacts.cs
-@@ -4426,6 +4426,76 @@ private StagedPackage CreateStagedPackage(int key, string id, StagedPackageStatu
+@@ -4426,6 +4426,58 @@ private StagedPackage CreateStagedPackage(int key, string id, StagedPackageStatu
                  return stagedPackage;
              }
  
@@ -52,24 +52,10 @@ index 823c0b8e07a0db8df8c99651095c370f9bea6bba..78a046613ff0294448d5f0fc16bc0320
 +                // Arrange
 +                var otherUser = _fakes.CreateUser("OtherUser");
 +                otherUser.Key = 2;
-+
 +                var package = CreatePackageRegistration("Normal.Package", 1, "1.0.0", "description").Packages.Single();
-+                var registrationWithNoVersions = new PackageRegistration { Id = "No.Versions" };
-+                registrationWithNoVersions.Owners.Add(_testUser);
++                var noVersions = new PackageRegistration { Id = "No.Versions" };
++                noVersions.Owners.Add(_testUser);
 +
-+                PackageOwnerRequest CreateRequest(PackageRegistration registration, User requestingOwner, User newOwner)
-+                {
-+                    return new PackageOwnerRequest
-+                    {
-+                        PackageRegistration = registration,
-+                        RequestingOwner = requestingOwner,
-+                        NewOwner = newOwner
-+                    };
-+                }
-+
-+                GetMock<IPackageService>()
-+                    .Setup(service => service.FindPackagesByAnyMatchingOwner(_testUser, It.IsAny<bool>(), false))
-+                    .Returns(Array.Empty<Package>());
 +                GetMock<IPackageService>()
 +                    .Setup(service => service.FindPackageByIdAndVersion("Normal.Package", null, SemVerLevelKey.SemVer2, true))
 +                    .Returns(package);
@@ -77,43 +63,39 @@ index 823c0b8e07a0db8df8c99651095c370f9bea6bba..78a046613ff0294448d5f0fc16bc0320
 +                    .Setup(service => service.GetPackageOwnershipRequests(null, null, _testUser))
 +                    .Returns(new[]
 +                    {
-+                        CreateRequest(registrationWithNoVersions, otherUser, _testUser),
-+                        CreateRequest(package.PackageRegistration, otherUser, _testUser)
++                        new PackageOwnerRequest { PackageRegistration = noVersions, RequestingOwner = otherUser, NewOwner = _testUser },
++                        new PackageOwnerRequest { PackageRegistration = package.PackageRegistration, RequestingOwner = otherUser, NewOwner = _testUser }
 +                    });
 +                GetMock<IPackageOwnerRequestService>()
 +                    .Setup(service => service.GetPackageOwnershipRequests(null, _testUser, null))
 +                    .Returns(new[]
 +                    {
-+                        CreateRequest(registrationWithNoVersions, _testUser, otherUser),
-+                        CreateRequest(package.PackageRegistration, _testUser, otherUser)
++                        new PackageOwnerRequest { PackageRegistration = noVersions, RequestingOwner = _testUser, NewOwner = otherUser }
 +                    });
 +
 +                // Act
 +                var model = ResultAssert.IsView<ManagePackagesViewModel>(_testController.Packages());
 +
 +                // Assert
-+                void AssertRequests(OwnerRequestsListViewModel list, bool canAccept)
-+                {
-+                    Assert.Equal(2, list.Requests.Count);
++                Assert.Collection(
++                    model.OwnerRequests.Received.Requests,
++                    request =>
++                    {
++                        Assert.Equal("No.Versions", request.Package.Id);
++                        Assert.True(request.CanAccept);
++                    },
++                    request =>
++                    {
++                        Assert.Equal("Normal.Package", request.Package.Id);
++                        Assert.Equal("1.0.0", request.Package.Version);
++                        Assert.True(request.CanAccept);
++                    });
 +
-+                    var withNoVersions = list.Requests.First();
-+                    Assert.Same(registrationWithNoVersions, withNoVersions.Request.PackageRegistration);
-+                    Assert.Equal("No.Versions", withNoVersions.Package.Id);
-+                    Assert.Equal(_testUser.Username, Assert.Single(withNoVersions.Package.Owners).Username);
-+                    Assert.Equal(canAccept, withNoVersions.CanAccept);
-+                    Assert.False(withNoVersions.CanCancel);
-+
-+                    var normal = list.Requests.Last();
-+                    Assert.Same(package.PackageRegistration, normal.Request.PackageRegistration);
-+                    Assert.Equal("Normal.Package", normal.Package.Id);
-+                    Assert.Equal("1.0.0", normal.Package.Version);
-+                    Assert.Equal(_testUser.Username, Assert.Single(normal.Package.Owners).Username);
-+                    Assert.Equal(canAccept, normal.CanAccept);
-+                    Assert.True(normal.CanCancel);
-+                }
-+
-+                AssertRequests(model.OwnerRequests.Received, canAccept: true);
-+                AssertRequests(model.OwnerRequests.Sent, canAccept: false);
++                var sent = Assert.Single(model.OwnerRequests.Sent.Requests);
++                Assert.Equal("No.Versions", sent.Package.Id);
++                Assert.Equal(_testUser.Username, Assert.Single(sent.Package.Owners).Username);
++                Assert.False(sent.CanAccept);
++                Assert.False(sent.CanCancel);
 +            }
 +
              [Fact]

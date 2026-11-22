@@ -25,7 +25,7 @@ index ded4709a35f7635fbe3f6f21b8c0926028b9dc71..129c0426002208285e545373bac9aa22
              // return the result of the query
              return Task.FromResult<IReadOnlyList<string>>(versions);
 diff --git a/tests/NuGetGallery.Facts/Queries/AutocompleteDatabasePackageVersionsQueryFacts.cs b/tests/NuGetGallery.Facts/Queries/AutocompleteDatabasePackageVersionsQueryFacts.cs
-index 0c2fa4f9a0e21176fd3bc0a6e3f5ea96eef79f4f..3cbe0fcbb48aed50c82f82684062ebd010c70749 100644
+index 0c2fa4f9a0e21176fd3bc0a6e3f5ea96eef79f4f..bebe36380f5747399cc015e4b0bb0024c90bcc7f 100644
 --- a/tests/NuGetGallery.Facts/Queries/AutocompleteDatabasePackageVersionsQueryFacts.cs
 +++ b/tests/NuGetGallery.Facts/Queries/AutocompleteDatabasePackageVersionsQueryFacts.cs
 @@ -131,6 +131,33 @@ public async Task WithPrereleaseTrueReturnsAllVersionsOfTheSamePackage()
@@ -38,7 +38,7 @@ index 0c2fa4f9a0e21176fd3bc0a6e3f5ea96eef79f4f..3cbe0fcbb48aed50c82f82684062ebd0
 +            {
 +                // Arrange
 +                var packageRegistration = new PackageRegistration { Id = "nuget" };
-+                var packages = new[] { "1.10.0", "2.0.0", "2.0.0-beta.10", "1.2.0", "1.0", "2.0.0-beta.2" }
++                var packages = new[] { "1.10.0", "2.0.0", "2.0.0-beta.10", "1.2.0.5", "1.2.0", "1.0", "2.0.0-beta.2" }
 +                    .Select(version => new Package
 +                    {
 +                        PackageRegistration = packageRegistration,
@@ -57,7 +57,7 @@ index 0c2fa4f9a0e21176fd3bc0a6e3f5ea96eef79f4f..3cbe0fcbb48aed50c82f82684062ebd0
 +                var queryResult = await _packageVersionsQuery.Execute("nuget", includePrerelease: true, semVerLevel: "2.0.0");
 +
 +                // Assert
-+                Assert.Equal(new[] { "1.0", "1.2.0", "1.10.0", "2.0.0-beta.2", "2.0.0-beta.10", "2.0.0" }, queryResult);
++                Assert.Equal(new[] { "1.0", "1.2.0", "1.2.0.5", "1.10.0", "2.0.0-beta.2", "2.0.0-beta.10", "2.0.0" }, queryResult);
 +            }
          }
  

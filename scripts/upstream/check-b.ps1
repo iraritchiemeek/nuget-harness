@@ -22,9 +22,10 @@ $showsOlder = "200 $Id|$Older"; $showsLatest = "200 $Id|$Latest"
 $cases = @(
     @{ User = 'owner'; What = 'a version that exists'; Path = "/packages/$Id/$Older/DeleteSymbols"; Before = $showsOlder; After = $showsOlder },
     @{ User = 'owner'; What = 'no version'; Path = "/packages/$Id/DeleteSymbols"; Before = $showsLatest; After = $showsLatest },
+    @{ User = 'owner'; What = 'an empty version'; Path = "/packages/$Id/DeleteSymbols?version="; Before = $showsLatest; After = $showsLatest },
     @{ User = 'owner'; What = 'a valid version that does not exist'; Path = "/packages/$Id/$Missing/DeleteSymbols"; Before = $showsLatest; After = '404' },
-    @{ User = 'owner'; What = 'absoluteLatest'; Path = "/packages/$Id/absoluteLatest/DeleteSymbols"; Before = $showsLatest; After = $showsLatest },
-    @{ User = 'owner'; What = 'ABSOLUTELATEST'; Path = "/packages/$Id/ABSOLUTELATEST/DeleteSymbols"; Before = $showsLatest; After = $showsLatest },
+    @{ User = 'owner'; What = 'absoluteLatest'; Path = "/packages/$Id/absoluteLatest/DeleteSymbols"; Before = $showsLatest; After = '404' },
+    @{ User = 'owner'; What = 'ABSOLUTELATEST'; Path = "/packages/$Id/ABSOLUTELATEST/DeleteSymbols"; Before = $showsLatest; After = '404' },
     @{ User = 'stranger'; What = 'a version that exists'; Path = "/packages/$Id/$Older/DeleteSymbols"; Before = '403'; After = '403' },
     @{ User = 'stranger'; What = 'a valid version that does not exist'; Path = "/packages/$Id/$Missing/DeleteSymbols"; Before = '403'; After = '404' }
 )

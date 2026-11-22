@@ -23,16 +23,16 @@
     ],
     "addedTests": [
       {
-        "test": "NuGetGallery.PackagesControllerFacts+TheDeleteSymbolsMethodWithMissingVersion.Returns404WhenOtherVersionsExist",
+        "test": "NuGetGallery.PackagesControllerFacts+TheDeleteSymbolsMethodWithExactVersion.Returns404IfVersionNotFound",
         "withoutFix": "Failed",
         "message": "HttpNotFoundResult"
       },
-      { "test": "NuGetGallery.PackagesControllerFacts+TheDeleteSymbolsMethodWithAbsoluteLatestVersion.*", "withoutFix": "Passed" }
+      { "test": "NuGetGallery.PackagesControllerFacts+TheDeleteSymbolsMethodWithEmptyVersion.*", "withoutFix": "Passed" }
     ],
     "removedTests": ["NuGetGallery.PackagesControllerFacts+TheDeleteSymbolsMethodWithMissingVersion.*"],
     "wrongFixFails": [
       "NuGetGallery.PackagesControllerFacts+TheDeleteSymbolsMethodWithNullVersion.*",
-      "NuGetGallery.PackagesControllerFacts+TheDeleteSymbolsMethodWithAbsoluteLatestVersion.*"
+      "NuGetGallery.PackagesControllerFacts+TheDeleteSymbolsMethodWithEmptyVersion.*"
     ]
   },
   "c": {
