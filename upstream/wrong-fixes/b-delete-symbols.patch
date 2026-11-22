@@ -1,0 +1,18 @@
+diff --git a/src/NuGetGallery/Controllers/PackagesController.cs b/src/NuGetGallery/Controllers/PackagesController.cs
+index 189e46679b8f729fe1a114573f211e8829b6a4db..abcf4d0538979c731f1565a0f229304db7994688 100644
+--- a/src/NuGetGallery/Controllers/PackagesController.cs
++++ b/src/NuGetGallery/Controllers/PackagesController.cs
+@@ -1960,13 +1960,6 @@ public virtual ActionResult DeleteSymbols(string id, string version)
+ 
+             if (package == null)
+             {
+-                // If the exact version was not found, fall back to the latest version.
+-                package = _packageService.FilterLatestPackage(packages, SemVerLevelKey.SemVer2, allowPrerelease: true);
+-            }
+-
+-            if (package == null)
+-            {
+-                // If the package has no versions, return not found.
+                 return HttpNotFound();
+             }
+ 

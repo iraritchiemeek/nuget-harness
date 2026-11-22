@@ -1,0 +1,86 @@
+diff --git a/src/NuGetGallery/Controllers/PackagesController.cs b/src/NuGetGallery/Controllers/PackagesController.cs
+index 189e46679b8f729fe1a114573f211e8829b6a4db..8434417b3e85b6af98a393d8f3d507897b4304ec 100644
+--- a/src/NuGetGallery/Controllers/PackagesController.cs
++++ b/src/NuGetGallery/Controllers/PackagesController.cs
+@@ -1958,15 +1958,16 @@ public virtual ActionResult DeleteSymbols(string id, string version)
+                 package = _packageService.FilterExactPackage(packages, version);
+             }
+ 
+-            if (package == null)
++            if (package == null
++                && (version == null || version.Equals(LatestPackageRouteVerifier.SupportedRoutes.AbsoluteLatestUrlString, StringComparison.InvariantCultureIgnoreCase)))
+             {
+-                // If the exact version was not found, fall back to the latest version.
++                // If no exact version was specified, use the latest version.
+                 package = _packageService.FilterLatestPackage(packages, SemVerLevelKey.SemVer2, allowPrerelease: true);
+             }
+ 
+             if (package == null)
+             {
+-                // If the package has no versions, return not found.
++                // If the specified version was not found or the package has no versions, return not found.
+                 return HttpNotFound();
+             }
+ 
+diff --git a/tests/NuGetGallery.Facts/Controllers/PackagesControllerFacts.cs b/tests/NuGetGallery.Facts/Controllers/PackagesControllerFacts.cs
+index 4aba75a800b60d23c80f39d9afc729c5663bb9c9..25532c8d762b0b29e8c59edf455acd4e0628c89c 100644
+--- a/tests/NuGetGallery.Facts/Controllers/PackagesControllerFacts.cs
++++ b/tests/NuGetGallery.Facts/Controllers/PackagesControllerFacts.cs
+@@ -4429,11 +4429,55 @@ protected override Mock<IPackageService> CreatePackageService()
+             }
+         }
+ 
+-        public class TheDeleteSymbolsMethodWithMissingVersion : TheDeleteSymbolsMethodThatFilters
++        public class TheDeleteSymbolsMethodWithMissingVersion : TestContainer
++        {
++            [Fact]
++            public void Returns404WhenOtherVersionsExist()
++            {
++                // Arrange
++                var packageRegistration = new PackageRegistration { Id = "CrestedGecko" };
++                packageRegistration.Owners.Add(TestUtility.FakeUser);
++                var package = new Package
++                {
++                    PackageRegistration = packageRegistration,
++                    Version = "1.0.0",
++                    NormalizedVersion = "1.0.0",
++                    IsLatestSemVer2 = true
++                };
++                packageRegistration.Packages.Add(package);
++
++                var packages = packageRegistration.Packages.ToList();
++                var packageService = new Mock<IPackageService>();
++                packageService
++                    .Setup(svc => svc.FindPackagesById(packageRegistration.Id, PackageDeprecationFieldsToInclude.None))
++                    .Returns(packages);
++                packageService
++                    .Setup(svc => svc.FilterExactPackage(packages, "2.0.0"))
++                    .Returns((Package)null);
++                packageService
++                    .Setup(svc => svc.FilterLatestPackage(packages, SemVerLevelKey.SemVer2, true))
++                    .Returns(package);
++
++                var controller = CreateController(GetConfigurationService(), packageService: packageService);
++                controller.SetCurrentUser(TestUtility.FakeUser);
++
++                var routeCollection = new RouteCollection();
++                Routes.RegisterRoutes(routeCollection);
++                controller.Url = new UrlHelper(controller.ControllerContext.RequestContext, routeCollection);
++
++                // Act
++                var result = controller.DeleteSymbols(packageRegistration.Id, "2.0.0");
++
++                // Assert
++                Assert.IsType<HttpNotFoundResult>(result);
++            }
++        }
++
++        public class TheDeleteSymbolsMethodWithAbsoluteLatestVersion : TheDeleteSymbolsMethodThatFilters
+         {
+             protected override ActionResult InvokeDeleteSymbols(PackagesController controller)
+             {
+-                return controller.DeleteSymbols(_packageId, "missing");
++                return controller.DeleteSymbols(_packageId, LatestPackageRouteVerifier.SupportedRoutes.AbsoluteLatestUrlString);
+             }
+         }
+ 

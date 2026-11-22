@@ -1,0 +1,55 @@
+{
+  "a": {
+    "patch": "a-version-order.patch",
+    "files": [
+      "src/NuGetGallery/Queries/AutocompleteDatabasePackageVersionsQuery.cs",
+      "tests/NuGetGallery.Facts/Queries/AutocompleteDatabasePackageVersionsQueryFacts.cs"
+    ],
+    "addedTests": [
+      {
+        "test": "NuGetGallery.Queries.AutocompleteDatabasePackageVersionsQueryFacts+Execute.ReturnsVersionsInSemVerOrder",
+        "withoutFix": "Failed",
+        "message": "Assert\\.Equal\\(\\) Failure"
+      }
+    ],
+    "removedTests": [],
+    "wrongFixFails": ["NuGetGallery.Queries.AutocompleteDatabasePackageVersionsQueryFacts+Execute.ReturnsVersionsInSemVerOrder"]
+  },
+  "b": {
+    "patch": "b-delete-symbols.patch",
+    "files": [
+      "src/NuGetGallery/Controllers/PackagesController.cs",
+      "tests/NuGetGallery.Facts/Controllers/PackagesControllerFacts.cs"
+    ],
+    "addedTests": [
+      {
+        "test": "NuGetGallery.PackagesControllerFacts+TheDeleteSymbolsMethodWithMissingVersion.Returns404WhenOtherVersionsExist",
+        "withoutFix": "Failed",
+        "message": "HttpNotFoundResult"
+      },
+      { "test": "NuGetGallery.PackagesControllerFacts+TheDeleteSymbolsMethodWithAbsoluteLatestVersion.*", "withoutFix": "Passed" }
+    ],
+    "removedTests": ["NuGetGallery.PackagesControllerFacts+TheDeleteSymbolsMethodWithMissingVersion.*"],
+    "wrongFixFails": [
+      "NuGetGallery.PackagesControllerFacts+TheDeleteSymbolsMethodWithNullVersion.*",
+      "NuGetGallery.PackagesControllerFacts+TheDeleteSymbolsMethodWithAbsoluteLatestVersion.*"
+    ]
+  },
+  "c": {
+    "patch": "c-owner-requests.patch",
+    "files": [
+      "src/NuGetGallery/Controllers/UsersController.cs",
+      "src/NuGetGallery/Helpers/ViewModelExtensions/ListPackageItemViewModelFactory.cs",
+      "tests/NuGetGallery.Facts/Controllers/UsersControllerFacts.cs"
+    ],
+    "addedTests": [
+      {
+        "test": "NuGetGallery.UsersControllerFacts+ThePackagesAction.IncludesOwnerRequestsForIdWithNoVersions",
+        "withoutFix": "Failed",
+        "message": "ArgumentNullException[\\s\\S]*package"
+      }
+    ],
+    "removedTests": [],
+    "wrongFixFails": ["NuGetGallery.UsersControllerFacts+ThePackagesAction.IncludesOwnerRequestsForIdWithNoVersions"]
+  }
+}

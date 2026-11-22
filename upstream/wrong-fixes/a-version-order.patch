@@ -1,0 +1,17 @@
+diff --git a/src/NuGetGallery/Queries/AutocompleteDatabasePackageVersionsQuery.cs b/src/NuGetGallery/Queries/AutocompleteDatabasePackageVersionsQuery.cs
+index ded4709a35f7635fbe3f6f21b8c0926028b9dc71..bfc2369df5e2d2dd8e6d8e6eceb0f0b6f58279fe 100644
+--- a/src/NuGetGallery/Queries/AutocompleteDatabasePackageVersionsQuery.cs
++++ b/src/NuGetGallery/Queries/AutocompleteDatabasePackageVersionsQuery.cs
+@@ -43,7 +43,11 @@ public Task<IReadOnlyList<string>> Execute(
+                 query = query.Where(p => !p.IsPrerelease);
+             }
+ 
+-            var versions = query.Select(p => p.Version).ToList();
++            var versions = query
++                .Select(p => p.Version)
++                .ToList()
++                .OrderBy(v => v, StringComparer.Ordinal)
++                .ToList();
+ 
+             // return the result of the query
+             return Task.FromResult<IReadOnlyList<string>>(versions);

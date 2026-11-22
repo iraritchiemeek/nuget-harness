@@ -1,0 +1,64 @@
+diff --git a/src/NuGetGallery/Queries/AutocompleteDatabasePackageVersionsQuery.cs b/src/NuGetGallery/Queries/AutocompleteDatabasePackageVersionsQuery.cs
+index ded4709a35f7635fbe3f6f21b8c0926028b9dc71..129c0426002208285e545373bac9aa22ab828a9d 100644
+--- a/src/NuGetGallery/Queries/AutocompleteDatabasePackageVersionsQuery.cs
++++ b/src/NuGetGallery/Queries/AutocompleteDatabasePackageVersionsQuery.cs
+@@ -7,6 +7,7 @@
+ using System.Linq;
+ using System.Threading.Tasks;
+ using NuGet.Services.Entities;
++using NuGet.Versioning;
+ 
+ namespace NuGetGallery
+ {
+@@ -43,7 +44,12 @@ public Task<IReadOnlyList<string>> Execute(
+                 query = query.Where(p => !p.IsPrerelease);
+             }
+ 
+-            var versions = query.Select(p => p.Version).ToList();
++            // sort in memory because SQL cannot express the SemVer order
++            var versions = query
++                .Select(p => p.Version)
++                .ToList()
++                .OrderBy(v => NuGetVersion.Parse(v))
++                .ToList();
+ 
+             // return the result of the query
+             return Task.FromResult<IReadOnlyList<string>>(versions);
+diff --git a/tests/NuGetGallery.Facts/Queries/AutocompleteDatabasePackageVersionsQueryFacts.cs b/tests/NuGetGallery.Facts/Queries/AutocompleteDatabasePackageVersionsQueryFacts.cs
+index 0c2fa4f9a0e21176fd3bc0a6e3f5ea96eef79f4f..3cbe0fcbb48aed50c82f82684062ebd010c70749 100644
+--- a/tests/NuGetGallery.Facts/Queries/AutocompleteDatabasePackageVersionsQueryFacts.cs
++++ b/tests/NuGetGallery.Facts/Queries/AutocompleteDatabasePackageVersionsQueryFacts.cs
+@@ -131,6 +131,33 @@ public async Task WithPrereleaseTrueReturnsAllVersionsOfTheSamePackage()
+ 
+                 Assert.True(allVersionsAreFromTheSamePackage);
+             }
++
++            [Fact]
++            public async Task ReturnsVersionsInSemVerOrder()
++            {
++                // Arrange
++                var packageRegistration = new PackageRegistration { Id = "nuget" };
++                var packages = new[] { "1.10.0", "2.0.0", "2.0.0-beta.10", "1.2.0", "1.0", "2.0.0-beta.2" }
++                    .Select(version => new Package
++                    {
++                        PackageRegistration = packageRegistration,
++                        PackageStatusKey = PackageStatus.Available,
++                        Listed = true,
++                        SemVerLevelKey = SemVerLevelKey.SemVer2,
++                        IsPrerelease = version.Contains("-"),
++                        Version = version
++                    })
++                    .ToList();
++                _packageRepository
++                    .Setup(context => context.GetAll())
++                    .Returns(packages.AsQueryable());
++
++                // Act
++                var queryResult = await _packageVersionsQuery.Execute("nuget", includePrerelease: true, semVerLevel: "2.0.0");
++
++                // Assert
++                Assert.Equal(new[] { "1.0", "1.2.0", "1.10.0", "2.0.0-beta.2", "2.0.0-beta.10", "2.0.0" }, queryResult);
++            }
+         }
+ 
+         public class FactBase

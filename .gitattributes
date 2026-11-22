@@ -3,3 +3,6 @@
 recordings/** -text
 # Hashed into recordings/manifest.json on Windows and checked on Linux, so no line-ending conversion.
 seed/state-b.txt -text
+# The upstream patches are applied and compared byte for byte, so no line-ending conversion.
+upstream/**/*.patch -text
+upstream/*.patch -text

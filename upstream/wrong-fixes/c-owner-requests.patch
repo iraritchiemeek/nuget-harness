@@ -1,0 +1,35 @@
+diff --git a/src/NuGetGallery/Controllers/UsersController.cs b/src/NuGetGallery/Controllers/UsersController.cs
+index 22dc658a50fd88af6f2740d5c17aab9f5107435b..34e1804a11234fd2c4c1d707103c51f4fe8bb24e 100644
+--- a/src/NuGetGallery/Controllers/UsersController.cs
++++ b/src/NuGetGallery/Controllers/UsersController.cs
+@@ -1749,17 +1749,28 @@ private OwnerRequestsViewModel CreateOwnerRequestsViewModel(IEnumerable<PackageO
+             {
+                 Received = new OwnerRequestsListViewModel
+                 {
+-                    Requests = received.Select(r => CreateOwnerRequestsListItemViewModel(r, currentUser)).ToList()
++                    Requests = CreateOwnerRequestsListItemViewModels(received, currentUser)
+                 },
+                 Sent = new OwnerRequestsListViewModel
+                 {
+-                    Requests = sent.Select(r => CreateOwnerRequestsListItemViewModel(r, currentUser)).ToList()
++                    Requests = CreateOwnerRequestsListItemViewModels(sent, currentUser)
+                 },
+             };
+ 
+             return viewModel;
+         }
+ 
++        private IReadOnlyCollection<OwnerRequestsListItemViewModel> CreateOwnerRequestsListItemViewModels(IEnumerable<PackageOwnerRequest> requests, User currentUser)
++        {
++            var requestList = requests.ToList();
++            if (requestList.Any(r => PackageService.FindPackageByIdAndVersion(r.PackageRegistration.Id, version: null, semVerLevelKey: SemVerLevelKey.SemVer2, allowPrerelease: true) == null))
++            {
++                return new List<OwnerRequestsListItemViewModel>();
++            }
++
++            return requestList.Select(r => CreateOwnerRequestsListItemViewModel(r, currentUser)).ToList();
++        }
++
+         private OwnerRequestsListItemViewModel CreateOwnerRequestsListItemViewModel(PackageOwnerRequest request, User currentUser)
+         {
+             var package = PackageService.FindPackageByIdAndVersion(request.PackageRegistration.Id, version: null, semVerLevelKey: SemVerLevelKey.SemVer2, allowPrerelease: true);
