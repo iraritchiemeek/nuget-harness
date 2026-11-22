@@ -46,7 +46,7 @@ function Edit-Body([string]$File, [string]$From, [string]$To) {
 }
 # Each case: the fault, the records it must be reported on, and a pattern every detail line must match.
 $cases = @(
-    @{ Case = 'unsorted'; Records = $reordered; Detail = '^    body (expected|actual)  \['
+    @{ Case = 'unsorted'; Records = $reordered; Detail = '^    body (expected  |actual    )\['
        Plant = { param($d) foreach ($r in $reordered) { Copy-Item (Join-Path $unpatched "$r.body") (Join-Path $d "$r.body") -Force } } },
     @{ Case = 'dropped'; Records = @($newtonsoft); Detail = '^    body (expected  \["5\.0\.7","8\.0\.3","13\.0\.4"\]|actual    \["8\.0\.3","13\.0\.4"\])$'
        Plant = { param($d) Edit-Body (Join-Path $d "$newtonsoft.body") '"5.0.7",' '' } },
