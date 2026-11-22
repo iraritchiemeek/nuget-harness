@@ -108,7 +108,7 @@ All four passed, with the wider warning check. Test results are the same as in r
 
 ## The HtmlSanitizer advisory
 
-**The problem.** GHSA-464h-4j8h-q5mf (HtmlSanitizer before 9.0.967, high) was published on 2026-11-19, after the last commit on `dev`. Upstream pins 9.0.892 and treats warnings as errors, so NU1903 fails the restore of the unpatched base. Upstream's CI failed the same way in run 44770292233 on 2026-11-20 (log read by both sessions: `NU1903: Warning As Error` on HtmlSanitizer 9.0.892). It also warned NU1902 on Microsoft.Build.Tasks.Git 8.0.0 in other projects. No build log here holds NU1902, and the check fails if one does.
+**The problem.** GHSA-464h-4j8h-q5mf (HtmlSanitizer before 9.0.967, high) was published on 2026-11-19, after the last commit on `dev`. Upstream pins 9.0.892 and treats warnings as errors, so NU1903 fails the restore of the unpatched base. Upstream's CI failed the same way in run 44770292233 on 2026-11-20 (log read by both sessions: `NU1903: Warning As Error` on HtmlSanitizer 9.0.892). It also warned NU1902 on Microsoft.Build.Tasks.Git 8.0.0, only in `NuGetGallery.AppHost`, in its Aspire job. No build log here holds NU1902, and the check fails if one does.
 
 **What was relaxed.** The two jobs that build set `WarningsNotAsErrors: NU1903`, which MSBuild reads as a property. No upstream file is edited, and the audit stays on. On its own this would let through a high-severity finding on any package.
 
