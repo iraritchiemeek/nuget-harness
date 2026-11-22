@@ -38,7 +38,7 @@ upstream-fix.yml the checks of the three fixes to NuGetGallery in upstream/ (spe
 ## Where to look
 
 - Specs: [`specs/01-old-app-running.md`](specs/01-old-app-running.md), [`specs/02-new-service-read-endpoints.md`](specs/02-new-service-read-endpoints.md) (with its amendments), and [`specs/02b-improve-behind-the-safety-net.md`](specs/02b-improve-behind-the-safety-net.md) (done: SemVer-ordered versions as an approved difference, a defined most-downloaded tie-break, EF Core LINQ queries, and a benchmark), and [`specs/03-upstream-fixes.md`](specs/03-upstream-fixes.md) (three small fixes for NuGetGallery itself, prepared and tested here; see [`evidence/03/run-log.md`](evidence/03/run-log.md)).
-- Evidence: [`evidence/01/run-log.md`](evidence/01/run-log.md), [`evidence/02/parity-report.md`](evidence/02/parity-report.md) (every check with the run that produced it), [`evidence/02/run-log.md`](evidence/02/run-log.md), [`evidence/02/reviews.md`](evidence/02/reviews.md), [`evidence/02b/run-log.md`](evidence/02b/run-log.md), [`evidence/02b/benchmark.md`](evidence/02b/benchmark.md), [`evidence/03/run-log.md`](evidence/03/run-log.md).
+- Evidence: [`evidence/01/run-log.md`](evidence/01/run-log.md), [`evidence/02/parity-report.md`](evidence/02/parity-report.md) (every check with the run that produced it), [`evidence/02/run-log.md`](evidence/02/run-log.md), [`evidence/02/reviews.md`](evidence/02/reviews.md), [`evidence/02b/run-log.md`](evidence/02b/run-log.md), [`evidence/02b/benchmark.md`](evidence/02b/benchmark.md), [`evidence/03/run-log.md`](evidence/03/run-log.md), [`evidence/03/reviews.md`](evidence/03/reviews.md).
 - The bar the code is held to: [`docs/engineering-standards.md`](docs/engineering-standards.md).
 
 ## Verify it yourself
