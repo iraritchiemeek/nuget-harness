@@ -19,9 +19,9 @@ This is about the database fallback only. `DefaultDependenciesModule.ConfigureAu
 **Repro Steps**
 
 1. Using this git commit of NuGetGallery: 63e6ee4202b441e1c904d6f78fc7b070f36bc24f. The query file is the same on `dev` at 06b7a81ab7bb92d5009082789b9e4ec5c81586cb.
-2. Run the gallery locally with no search service configured, and push Serilog 1.4.128, then 1.3.30, then 4.4.0.
+2. Run the gallery with no search service configured, with Serilog 1.4.128, 1.3.30 and 4.4.0 pushed in that order.
 3. Request `/api/v2/package-versions/Serilog`.
-4. The answer is `["1.4.128","1.3.30","4.4.0"]` ([run](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44977396894)).
+4. The answer is `["1.4.128","1.3.30","4.4.0"]`, seen on a gallery in CI that also holds other packages, restored from a snapshot ([run](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44977396894)).
 
 **Expected Behavior**
 

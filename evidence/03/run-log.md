@@ -108,7 +108,7 @@ All four passed, with the wider warning check. Test results are the same as in r
 
 ## The HtmlSanitizer advisory
 
-**The problem.** GHSA-464h-4j8h-q5mf (HtmlSanitizer before 9.0.967, high) was published on 2026-11-19, after the last commit on `dev`. Upstream pins 9.0.892 and treats warnings as errors, so NU1903 fails the restore of the unpatched base. Upstream's CI failed the same way in run 44770292233 on 2026-11-20 (read).
+**The problem.** GHSA-464h-4j8h-q5mf (HtmlSanitizer before 9.0.967, high) was published on 2026-11-19, after the last commit on `dev`. Upstream pins 9.0.892 and treats warnings as errors, so NU1903 fails the restore of the unpatched base. Upstream's CI failed the same way in run 44770292233 on 2026-11-20 (log read by both sessions: `NU1903: Warning As Error` on HtmlSanitizer 9.0.892). It also warned NU1902 on Microsoft.Build.Tasks.Git 8.0.0 in other projects. No build log here holds NU1902, and the check fails if one does.
 
 **What was relaxed.** The two jobs that build set `WarningsNotAsErrors: NU1903`, which MSBuild reads as a property. No upstream file is edited, and the audit stays on. On its own this would let through a high-severity finding on any package.
 
@@ -139,7 +139,8 @@ Relaxing it was the first agent's decision. The orchestrator confirmed that a wo
 - **C: why `ListPackageItemViewModelFactory.cs` is touched.** The spec allows the view-model, view and URL helper files C needs. This file is the view-model's factory. `OwnerRequestsListItemViewModel` needs a `ListPackageItemViewModel`, and the helper that builds its `Owners` (`GetBasicUserViewModel`) is private to the factory. The new method is there so that `UsersController` doesn't build the view-model by hand. No view, view-model class or URL helper changed.
 - **C: the sender can't cancel from the page.** `CanCancel` comes from a permission on a package version, and there is none, so every permission is left false. The "Manage Ownership" link it controls would lead to a 404. The spec says "rejected or cancelled", so this half is not met. The PR says so.
 - **The issue search for A** (session one): four queries, no matching open issue. #5486 is about OData. Session two repeated it with four queries and read the titles of the first 12 results of each: none matches.
-- **nuget.org**, for A's issue: at 02:44, the whole answers to `GET /api/v2/package-versions/Serilog` (185 versions) and `/Newtonsoft.Json` (53) were in SemVer order, oldest first. Two anonymous GETs, and nothing else is claimed.
+- **Issues #6931 and #5675**, checked today: both open, both labelled Stale, and no open pull request found for either. A merged pull request, #10496, mentions #5675 but fixes something else (the catalog job). `dev` is still at 06b7a81.
+- **nuget.org**, for A's issue: at 02:44, the whole answers to `GET /api/v2/package-versions/Serilog` (185 versions) and `/Newtonsoft.Json` (53) were in SemVer order, oldest first. Two anonymous GETs from the agent's machine, so no public run backs this one claim.
 - **The drafts were public before anything was tested.** `17a7b1b` claimed reproductions and test results nobody had seen. `13a55b5` removed them or marked them pending, before round 2 was read. Claims went back in only with a run from round 4.
 
 ## What backs each claim in the drafts
