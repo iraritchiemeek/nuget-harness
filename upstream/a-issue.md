@@ -2,7 +2,7 @@
 
 Self-hosted issue template (`.github/ISSUE_TEMPLATE/SELF_HOSTED.yml`). Everything below the line is the text to post.
 
-**Not ready to post.** Nothing marked `[PENDING]` has been observed in a run yet. Each such claim goes back in only once a run backs it.
+Not to be posted before the repository owner approves it, after the independent review. The backing of each claim is in [`evidence/03/run-log.md`](../evidence/03/run-log.md).
 
 ---
 
@@ -12,16 +12,16 @@ Self-hosted issue template (`.github/ISSUE_TEMPLATE/SELF_HOSTED.yml`). Everythin
 
 **Describe the bug**
 
-`GET /api/v2/package-versions/{id}` returns versions in no defined order when no search service is configured, for example in local development. `AutocompleteDatabasePackageVersionsQuery` has no `OrderBy`, so the order is whatever the SQL query plan gives.
+`GET /api/v2/package-versions/{id}` returns versions in no defined order when no search service is configured, for example in local development. `AutocompleteDatabasePackageVersionsQuery` has no `OrderBy`, so nothing defines the order.
 
-This is about the database fallback only. `DefaultDependenciesModule.ConfigureAutocomplete` uses `AutocompleteServicePackageVersionsQuery` when a search service is configured, and the parts of nuget.org's answers I read for Serilog and Newtonsoft.Json (2026-11-22) were in SemVer order, oldest first.
+This is about the database fallback only. `DefaultDependenciesModule.ConfigureAutocomplete` uses `AutocompleteServicePackageVersionsQuery` when a search service is configured, and nuget.org's answers for Serilog and Newtonsoft.Json (2026-11-22) were in SemVer order, oldest first.
 
 **Repro Steps**
 
-1. Using this git commit of NuGetGallery: 06b7a81ab7bb92d5009082789b9e4ec5c81586cb (dev)
+1. Using this git commit of NuGetGallery: 63e6ee4202b441e1c904d6f78fc7b070f36bc24f. The query file is the same on `dev` at 06b7a81ab7bb92d5009082789b9e4ec5c81586cb.
 2. Run the gallery locally with no search service configured, and push Serilog 1.4.128, then 1.3.30, then 4.4.0.
 3. Request `/api/v2/package-versions/Serilog`.
-4. [PENDING: the answer at this commit. `["1.4.128","1.3.30","4.4.0"]` was recorded at 63e6ee4202b441e1c904d6f78fc7b070f36bc24f only.]
+4. The answer is `["1.4.128","1.3.30","4.4.0"]` ([run](https://github.com/iraritchiemeek/nuget-harness/actions/runs/44977396894)).
 
 **Expected Behavior**
 
