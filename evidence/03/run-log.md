@@ -161,7 +161,7 @@ Relaxing it was the first agent's decision. The orchestrator confirmed that a wo
 
 ## What backs each claim in the drafts
 
-Runs: A is 44980456732, B is 44980465212, C is 44980473424. "Source" is upstream at 06b7a81. Every line of the drafts that states a result or a fact is here.
+Runs: A is 44980456732, B is 44980465212, C is 44980473424. "Source" is upstream at 06b7a81.
 
 | Draft | Claim | Backed by |
 |---|---|---|
