@@ -15,6 +15,13 @@ try {
         ForEach-Object { ($_ -creplace '^.*?([^\\/(:]+)\(\d+(,\d+)*\): ', '$1: ' -creplace '\s*\[[^\]]*\]\s*$', '').Trim() } | Sort-Object -Unique)
     Write-Utf8File (Join-Path $dir 'warnings.txt') $warnings
 
+    # upstream-fix.yml keeps NuGet's audit on but stops NU1903 failing the restore (see its env). The only
+    # finding that may be let through is the one on the upstream base; any other is a failure here.
+    $known = "Package 'HtmlSanitizer' 9.0.892 has a known high severity vulnerability, https://github.com/advisories/GHSA-464h-4j8h-q5mf"
+    $audit = @(Get-Content $log | Where-Object { $_ -cmatch '\bNU19\d\d\b' } | ForEach-Object { $_ -creplace '^.*?Package ', 'Package ' -creplace '\s*\[[^\]]*\]\s*$', '' } | Sort-Object -Unique)
+    if (Compare-Object $audit @($known)) { throw "the NuGet audit did not report exactly the known advisory: $($audit -join '; ')" }
+    Write-Summary "- NuGet audit: exactly one advisory, the one on the unpatched base ($known)"
+
     $trx = Join-Path $env:RUNNER_TEMP 'facts.trx'
     & dotnet test tests\NuGetGallery.Facts\NuGetGallery.Facts.csproj --no-restore --no-build --configuration Release "-l:trx;LogFileName=$trx" | Select-Object -Last 15
     if (-not (Test-Path $trx)) { throw 'the test run wrote no result file' }

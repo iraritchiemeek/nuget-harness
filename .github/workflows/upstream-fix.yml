@@ -21,6 +21,12 @@ permissions:
 env:
   UPSTREAM_SHA: 06b7a81ab7bb92d5009082789b9e4ec5c81586cb # NuGetGallery dev, the base of every patch
   HARNESS_SHA: 63e6ee4202b441e1c904d6f78fc7b070f36bc24f # the commit specs 01 and 02 run (PR A's app check)
+  # Neither base restores as it stands. GHSA-464h-4j8h-q5mf (HtmlSanitizer 9.0.892) reached NuGet's audit on
+  # 2026-11-20, after the last commit on dev: NU1903 is a warning, NuGetGallery.csproj treats warnings as
+  # errors, and the restore fails. Upstream's own CI fails the same way (NuGet/NuGetGallery run 44770292233).
+  # MSBuild reads this variable as a property. The audit still runs and reports; only NU1903 is not an
+  # error. test-variant.ps1 fails on any audit finding other than that one.
+  WarningsNotAsErrors: NU1903
   DOTNET_NOLOGO: 'true'
   DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
 
