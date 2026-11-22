@@ -7,7 +7,7 @@ Four runs of [`benchmark.yml`](../../.github/workflows/benchmark.yml) on `396c87
 - **Throughput.** The new service answered more requests per second than the old app at every concurrency level. The smallest margin in any run was 4.1 times (run 1, concurrency 8).
 - **Median and p95 latency.** The new service's p50 and p95 were lower than the old app's at every level.
 - **Errors.** Neither app returned an error in any run.
-- **Database reads.** Per execution, the new service's queries read fewer pages: prefix searches about 3.8 times fewer, package-versions about 22 times fewer, and most-downloaded about 30% fewer. The reads were the same in every run, to one decimal place.
+- **Database reads.** (These figures, and the CPU figures below, are for the old app's database fallback. When a search service is configured, the old app answers both endpoints from that service instead, and this benchmark says nothing about that.) Per execution, the new service's queries read fewer pages: prefix searches about 3.8 times fewer, package-versions about 22 times fewer, and most-downloaded about 30% fewer. The reads were the same in every run, to one decimal place.
 - **Database CPU.** Per execution, the new service's queries used less CPU time for each of the three query types.
 
 ## What does not hold, so is not claimed
@@ -21,7 +21,7 @@ Four runs of [`benchmark.yml`](../../.github/workflows/benchmark.yml) on `396c87
 - **Machine.** One GitHub-hosted `windows-2022` runner per run: 4 logical processors, 16 GB. SQL Server 2019 LocalDB (15.0.4382.1, Express Edition). The CPU model of each run is with its table below.
 - **Database.** Both apps read the same LocalDB database, restored from the state A seed snapshot (148 package IDs, every download count 0).
 - **The apps.**
-  - The old app: NuGetGallery at the pinned commit, unmodified, on IIS Express, as the harness runs it everywhere else.
+  - The old app: NuGetGallery at the pinned commit, unmodified, on IIS Express, as the harness runs it everywhere else. No search service is configured, so it answers both endpoints from its database.
   - The new service: the self-contained win-x64 build of `service/` on Kestrel, reading with the `reader` login (`db_datareader` only).
 - **Load tool.** k6 v2.4.0, its download checked against a SHA-256 in the workflow. It runs on the same machine.
 - **Request mix.** Taken from `recordings/requests.txt`: every GET request the old app answered 200 with JSON in state A. 1,000 slots are filled by cycling through each group, then shuffled with a fixed seed, so both apps get the same sequence:
