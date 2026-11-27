@@ -1,6 +1,6 @@
 <Project>
   <ItemGroup>
-    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.341" />
+    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.342" />
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.1.2" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.15" />
     <!-- The version NuGetGallery 63e6ee42 uses (its Directory.Packages.props, NuGetClientPackageVersion),
